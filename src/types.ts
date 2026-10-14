@@ -169,7 +169,7 @@ export const DEFAULT_PENALTIES: PenaltyRule[] = [
 ];
 
 export const DEFAULT_CLUB: ClubSettings = {
-  clubName: 'Mein Verein',
+  clubName: 'SV Grün-Weiß Annaburg',
   coachName: '',
   theme: 'system',
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from './data/store';
 import { NavCtx, Route, TABS, Tab } from './nav';
+import { ClubLogo } from './components/ClubLogo';
 import { Icon } from './components/Icon';
 import { handleBack, Sheet } from './components/ui';
 import { hideSplash, onAndroidBack, styleStatusBar } from './lib/native';
@@ -103,7 +104,7 @@ export function App() {
   if (phase === 'booting')
     return (
       <div className="boot" role="status" aria-label="TeamTime wird geladen">
-        <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+        <ClubLogo src={club.clubLogoUrl} alt="" />
         <strong>TeamTime</strong>
         <span className="boot-bar" />
       </div>
@@ -139,7 +140,7 @@ export function App() {
       <div className="shell">
         <aside className="sidebar">
           <button className="brand" onClick={() => go({ tab: 'home' })}>
-            <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+            <ClubLogo src={club.clubLogoUrl} alt="" />
             <span>
               <strong>{club.clubName}</strong>
               {club.teamName && <small>{club.teamName}</small>}
@@ -157,7 +158,7 @@ export function App() {
         </aside>
 
         <header className="topbar">
-          <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+          <ClubLogo src={club.clubLogoUrl} alt="" />
           <div className="topbar-name">
             <strong>{club.clubName}</strong>
             {club.teamName && <small>{club.teamName}</small>}

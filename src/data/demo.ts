@@ -114,7 +114,7 @@ export function demoData(): TeamData {
     events,
     club: {
       ...DEFAULT_CLUB,
-      clubName: 'SV Musterstadt',
+      clubName: 'SV Grün-Weiß Annaburg',
       teamName: '1. Herren',
       coachName: 'Demo-Trainer',
       penaltyCatalog: DEFAULT_PENALTIES,

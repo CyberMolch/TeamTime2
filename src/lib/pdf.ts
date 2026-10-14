@@ -50,7 +50,7 @@ export async function buildReport(opts: { title: string; subtitle?: string; club
   pdf.setCreator('TeamTime');
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const logo = await loadLogo(pdf, opts.logo || './wappen.png');
+  const logo = (opts.logo && /^(data:|https?:)/.test(opts.logo) ? await loadLogo(pdf, opts.logo) : null) || (await loadLogo(pdf, './wappen.png'));
   const c = (x: { r: number; g: number; b: number }) => rgb(x.r, x.g, x.b);
 
   const W = 595.28;

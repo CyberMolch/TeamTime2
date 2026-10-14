@@ -5,6 +5,7 @@ import { formatDateNumeric, isOver, todayISO } from '../lib/dates';
 import { isNative, pickFile, pickImage, saveFile } from '../lib/native';
 import { exportCalendar, loadReminderPrefs, ReminderPrefs, requestNotificationPermission, saveReminderPrefs, scheduleReminders } from '../lib/reminders';
 import { buildReport, savePDF } from '../lib/pdf';
+import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
 import { Field, PageHead, Segmented, useDialog } from '../components/ui';
 
@@ -90,7 +91,7 @@ export function SettingsView() {
             <h2 className="panel-title">Verein & Mannschaft</h2>
             <div className="form-grid">
               <div className="full" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <img src={form.clubLogoUrl || './wappen.png'} alt="Vereinswappen" style={{ width: 56, height: 64, objectFit: 'contain' }} />
+                <ClubLogo src={form.clubLogoUrl} alt="Vereinswappen" style={{ width: 56, height: 64, objectFit: 'contain' }} />
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button
                     className="btn btn-sm"

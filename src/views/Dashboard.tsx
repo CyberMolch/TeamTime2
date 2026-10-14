@@ -6,6 +6,7 @@ import { addDays, currentSeasonStart, formatDate, isOver, nextBirthday, relative
 import { attendanceFor, countStatus, euro, fineBalance, matchRecord, pastEvents } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
 import { shareText } from '../lib/native';
+import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, useDialog } from '../components/ui';
 import { AttendanceBar } from '../components/AttendanceBar';
@@ -259,7 +260,7 @@ function Kickoff({ e, onShare }: { e: TeamEvent; onShare: () => void }) {
   const ownSide = (
     <div className="nx-side">
       <span className="nx-crest">
-        <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+        <ClubLogo src={club.clubLogoUrl} alt="" />
       </span>
       <span className="nx-team">{own}</span>
     </div>

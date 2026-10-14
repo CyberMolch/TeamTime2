@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useStore } from '../data/store';
 import { isNative } from '../lib/native';
 import { Field } from '../components/ui';
+import { Welcome } from './Welcome';
 
 export function Login() {
   const { enterCloud, enterDemo, error: storeError } = useStore();
@@ -12,6 +13,7 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const native = isNative();
+  const [step, setStep] = useState<'welcome' | 'form'>(storeError ? 'form' : 'welcome');
 
   const run = async (fn: (fb: typeof import('../data/firebase')) => Promise<unknown>) => {
     setBusy(true);
@@ -50,10 +52,28 @@ export function Login() {
     }
   };
 
+  if (step === 'welcome')
+    return (
+      <Welcome
+        onLogin={() => {
+          setMode('login');
+          setStep('form');
+        }}
+        onRegister={() => {
+          setMode('register');
+          setStep('form');
+        }}
+        onDemo={enterDemo}
+      />
+    );
+
   return (
     <div className="login">
       <section className="login-main">
         <div className="login-box login-card">
+          <button className="back-link" onClick={() => setStep('welcome')} style={{ alignSelf: 'flex-start', marginBottom: -6 }}>
+            ‹ Zurück
+          </button>
           <div className="login-brand">
             <img src="./wappen.png" alt="" />
             <h1>{mode === 'login' ? 'Willkommen zurück' : 'Konto anlegen'}</h1>
