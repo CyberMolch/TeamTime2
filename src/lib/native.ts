@@ -1,0 +1,112 @@
+// Kleine Brücke zwischen Browser und Android-App (Capacitor).
+// Die Capacitor-Module werden nur in der App geladen, im Browser nie.
+
+export const isNative = (): boolean => !!(window as any).Capacitor?.isNativePlatform?.();
+
+export const newId = () =>
+  (crypto as any).randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 20) : Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+
+/** Text teilen (WhatsApp & Co.). Fällt auf "In Zwischenablage kopieren" zurück. */
+export async function shareText(title: string, text: string): Promise<'shared' | 'copied' | 'failed'> {
+  try {
+    if (isNative()) {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ title, text, dialogTitle: title });
+      return 'shared';
+    }
+    if (navigator.share) {
+      await navigator.share({ title, text });
+      return 'shared';
+    }
+  } catch (e: any) {
+    if (e?.name === 'AbortError' || /cancel/i.test(String(e?.message))) return 'shared';
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}
+
+/** Datei speichern: im Browser als Download, in der App über das Teilen-Menü. */
+export async function saveFile(filename: string, content: string, mime: string): Promise<void> {
+  if (isNative()) {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+    const res = await Filesystem.writeFile({ path: filename, data: content, directory: Directory.Cache, encoding: Encoding.UTF8 });
+    await Share.share({ title: filename, url: res.uri, dialogTitle: 'Datei speichern oder senden' });
+    return;
+  }
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+export function pickFile(accept: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
+
+/** Bild auswählen und als kleines quadratisches JPEG (data-URL) zurückgeben. */
+export function pickImage(size = 256): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d')!;
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(file);
+    };
+    input.click();
+  });
+}
+
+/** Android-Zurück-Taste: ruft den Handler auf; liefert er false, wird die App minimiert. */
+export async function onAndroidBack(handler: () => boolean): Promise<() => void> {
+  if (!isNative()) return () => {};
+  const { App } = await import('@capacitor/app');
+  const sub = await App.addListener('backButton', () => {
+    if (!handler()) App.minimizeApp();
+  });
+  return () => sub.remove();
+}
+
+export function toCSV(rows: (string | number)[][]): string {
+  const esc = (v: string | number) => {
+    const s = String(v ?? '');
+    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  // Semikolon + BOM: öffnet sich in deutschem Excel direkt richtig
+  return '﻿' + rows.map((r) => r.map(esc).join(';')).join('\r\n');
+}
