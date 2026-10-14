@@ -81,7 +81,7 @@ export const useDialog = () => useContext(DialogCtx)!;
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ id: number; msg: string; action?: { label: string; run: () => void } } | null>(null);
   const [ask, setAsk] = useState<{ msg: string; title?: string; ok?: string; danger?: boolean; resolve: (v: boolean) => void } | null>(null);
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
 
   const api: DialogApi = {
     toast: useCallback((msg, action) => {
