@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
   appId: 'de.cybermolch.teamtime',
   appName: 'TeamTime',
   webDir: 'dist',
-  backgroundColor: '#f3f6f2',
+  backgroundColor: '#f5f6f8',
   android: {
     // Ab Android 15 zeichnen Apps sonst unter die Statusleiste
     adjustMarginsForEdgeToEdge: 'force',

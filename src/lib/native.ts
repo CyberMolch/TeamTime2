@@ -126,9 +126,8 @@ export async function styleStatusBar(dark: boolean, color: string) {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
     await StatusBar.setOverlaysWebView({ overlay: false });
     await StatusBar.setBackgroundColor({ color });
-    // Helle Schrift: passt auf Vereinsgrün und auf den dunklen Modus
-    await StatusBar.setStyle({ style: Style.Dark });
-    void dark;
+    // Dunkle Symbole auf hellem Grund, helle Symbole im Dunkelmodus
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
   } catch {
     /* ältere Geräte: egal */
   }

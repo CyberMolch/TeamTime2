@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon';
 import { Avatar, Empty, Field, Sheet, StatusDot, useDialog } from '../components/ui';
 import { DateTile } from '../components/EventRow';
 import { EventForm } from '../components/EventForm';
+import { AttendanceBar } from '../components/AttendanceBar';
 import { nextJerseyCandidate } from './Jerseys';
 import { exportCalendar } from '../lib/reminders';
 
@@ -220,23 +221,8 @@ export function EventDetail({ id }: { id: string }) {
       {tab === 'att' || !match ? (
         <>
           <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-            <div className="counts">
-              <span>
-                <StatusDot status="present" />
-                <b>{c.present}</b> dabei
-              </span>
-              <span>
-                <StatusDot status="unsure" />
-                <b>{c.unsure}</b> unsicher
-              </span>
-              <span>
-                <StatusDot status="absent" />
-                <b>{c.absent + c.excused + c.injured}</b> fehlen
-              </span>
-              <span>
-                <StatusDot status="none" />
-                <b>{c.none}</b> offen
-              </span>
+            <div className="grow" style={{ minWidth: 240 }}>
+              <AttendanceBar c={c} compact />
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {c.none > 0 && (

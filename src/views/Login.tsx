@@ -52,14 +52,13 @@ export function Login() {
 
   return (
     <div className="login">
-      <section className="login-side">
-        <img src="./wappen.png" alt="" />
-        <h1>TeamTime</h1>
-        <p>Termine, Zusagen, Kader, Mannschaftskasse und Trikotwäsche – für Trainer und Betreuer, am PC und auf dem Handy.</p>
-      </section>
       <section className="login-main">
-        <div className="login-box">
-          <h2>{mode === 'login' ? 'Anmelden' : 'Konto anlegen'}</h2>
+        <div className="login-box login-card">
+          <div className="login-brand">
+            <img src="./wappen.png" alt="" />
+            <h1>{mode === 'login' ? 'Willkommen zurück' : 'Konto anlegen'}</h1>
+            <p className="muted">Termine, Zusagen, Kader und Kasse – für Trainer und Betreuer.</p>
+          </div>
 
           {!native && (
             <>

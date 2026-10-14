@@ -79,7 +79,7 @@ jobs:
 
       - name: Versionsnummer setzen
         run: |
-          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]+\"/versionName \"2.0.${{ github.run_number }}\"/" android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]+\"/versionName \"2.2.${{ github.run_number }}\"/" android/app/build.gradle
           grep -E "versionCode|versionName" android/app/build.gradle
 
       - name: APK bauen
@@ -101,8 +101,8 @@ jobs:
       - name: Release mit APK anlegen
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.${{ github.run_number }}
-          name: TeamTime 2.0.${{ github.run_number }}
+          tag_name: v2.2.${{ github.run_number }}
+          name: TeamTime 2.2.${{ github.run_number }}
           make_latest: true
           files: TeamTime.apk
           body: |

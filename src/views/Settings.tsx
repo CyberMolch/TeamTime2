@@ -8,7 +8,7 @@ import { buildReport, savePDF } from '../lib/pdf';
 import { Icon } from '../components/Icon';
 import { Field, PageHead, Segmented, useDialog } from '../components/ui';
 
-export const APP_VERSION = '2.1';
+export const APP_VERSION = '2.2';
 export const REPO_URL = 'https://github.com/CyberMolch/TeamTime2';
 export const WEB_URL = 'https://cybermolch.github.io/TeamTime2/';
 

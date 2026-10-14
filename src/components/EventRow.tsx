@@ -35,12 +35,8 @@ export function EventRow({ e }: { e: TeamEvent }) {
         <span className="title ellipsis" style={{ display: 'block' }}>
           {eventTitle(e)}
         </span>
-        <span className="sub" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <span>
-            {eventTitle(e) === TYPE_LABEL[e.type] ? '' : `${TYPE_LABEL[e.type]} · `}
-            {e.time} Uhr
-          </span>
-          {e.location && <span className="ellipsis" style={{ maxWidth: '22ch' }}>{e.location}</span>}
+        <span className="sub ellipsis" style={{ display: 'block' }}>
+          {[eventTitle(e) === TYPE_LABEL[e.type] ? null : TYPE_LABEL[e.type], `${e.time} Uhr`, e.location].filter(Boolean).join(' · ')}
         </span>
       </span>
       {e.cancelled ? (

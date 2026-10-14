@@ -5,6 +5,7 @@ import { Icon } from './components/Icon';
 import { handleBack, Sheet } from './components/ui';
 import { hideSplash, onAndroidBack, styleStatusBar } from './lib/native';
 import { onReminderTap, scheduleReminders } from './lib/reminders';
+import { initials } from './lib/stats';
 import { Login } from './views/Login';
 import { Dashboard } from './views/Dashboard';
 import { EventsView } from './views/Events';
@@ -22,7 +23,7 @@ function useTheme(theme?: string) {
     if (theme === 'dark' || theme === 'light') root.dataset.theme = theme;
     else delete root.dataset.theme;
     const dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-    const color = dark ? '#13231b' : '#0a6b3a';
+    const color = dark ? '#0e1311' : '#f5f6f8';
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', color);
     styleStatusBar(dark, color);
   }, [theme]);
@@ -162,6 +163,9 @@ export function App() {
             {club.teamName && <small>{club.teamName}</small>}
           </div>
           <SyncBadge compact />
+          <button className="avatar topbar-av" onClick={() => go({ tab: 'settings' })} aria-label="Einstellungen">
+            {initials(club.coachName || club.clubName || 'T')}
+          </button>
         </header>
 
         <main className="main" ref={mainRef}>

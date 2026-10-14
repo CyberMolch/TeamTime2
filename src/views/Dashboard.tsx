@@ -8,6 +8,7 @@ import { eventHeading, eventShareText } from '../lib/texts';
 import { shareText } from '../lib/native';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, useDialog } from '../components/ui';
+import { AttendanceBar } from '../components/AttendanceBar';
 import { EventRow, ResultBadge } from '../components/EventRow';
 import { nextJerseyCandidate } from './Jerseys';
 
@@ -63,10 +64,10 @@ export function Dashboard() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">
+          <h1>Übersicht</h1>
+          <p className="page-sub">
             {weekdayLong(today)}, {formatDate(today).split(', ')[1]} · Saison {seasonLabel(seasonStart)}
           </p>
-          <h1>{club.teamName || 'Übersicht'}</h1>
         </div>
       </div>
 
@@ -111,11 +112,11 @@ export function Dashboard() {
           <div className="stat-value">
             {record.win}–{record.draw}–{record.loss}
           </div>
-          <div className="stat-label">Siege, Remis, Niederlagen</div>
+          <div className="stat-label">Bilanz (S–U–N)</div>
         </button>
         <button className="stat" onClick={() => go({ tab: 'stats' })}>
           <div className="stat-value">{avgTraining ?? '–'}</div>
-          <div className="stat-label">Ø im Training (4 Wochen)</div>
+          <div className="stat-label">Ø im Training</div>
         </button>
         <button className={'stat' + (fines.open > 0 ? ' stat-rose' : '')} onClick={() => go({ tab: 'cash' })}>
           <div className="stat-value">{euro(fines.open)}</div>
@@ -242,78 +243,77 @@ export function Dashboard() {
 
 
 function Kickoff({ e, onShare }: { e: TeamEvent; onShare: () => void }) {
-  const { players } = useStore();
+  const { players, club } = useStore();
   const { go } = useNav();
   const c = countStatus(e, players);
-  const order = ['present', 'unsure', 'excused', 'absent', 'injured', 'none'] as const;
-  const strip = [...players].sort((a, b) => order.indexOf((e.attendance[a.id] || 'none') as any) - order.indexOf((e.attendance[b.id] || 'none') as any));
+  const match = isMatch(e.type) && !!e.opponent;
+  const open = () => go({ tab: 'events', eventId: e.id });
+  const own = club.teamName || club.clubName;
+  const oppInitials = (e.opponent || '')
+    .replace(/^(SV|FC|SG|TSV|VfB|VfL|SC|FSV|BSG|TuS|SpVgg|1\.)\s+/i, '')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  const ownSide = (
+    <div className="nx-side">
+      <span className="nx-crest">
+        <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+      </span>
+      <span className="nx-team">{own}</span>
+    </div>
+  );
+  const oppSide = (
+    <div className="nx-side">
+      <span className="nx-crest nx-opp">{oppInitials || '?'}</span>
+      <span className="nx-team">{e.opponent}</span>
+    </div>
+  );
   return (
-    <div className="kickoff">
-      <button className="kickoff-left" onClick={() => go({ tab: 'events', eventId: e.id })} aria-label="Termin öffnen">
-        <span className="kickoff-day">{relativeDay(e.date)}</span>
-        <span>
-          <span className="kickoff-time" style={{ display: 'block' }}>
-            {e.time}
-          </span>
-          {e.meetTime && <span className="kickoff-meet">Treffpunkt {e.meetTime}</span>}
+    <div className="card nx">
+      <div className="nx-head">
+        <span className="chip-soft">
+          {TYPE_LABEL[e.type]} · {relativeDay(e.date)}
         </span>
-      </button>
-      <div className="kickoff-right">
-        <div>
-          {(isMatch(e.type) || (e.title && e.title !== TYPE_LABEL[e.type])) && <div className="small muted">{TYPE_LABEL[e.type]}</div>}
-          <button className="kickoff-title" onClick={() => go({ tab: 'events', eventId: e.id })} style={{ textAlign: 'left' }}>
-            {eventHeading(e).replace(TYPE_LABEL[e.type] + ' ', '')}
-          </button>
-        </div>
-        <div className="kickoff-meta">
-          <span>
-            <Icon name="calendar" size={16} />
-            {formatDate(e.date)}
+        {e.cancelled && <span className="tag tag-rose">Abgesagt</span>}
+      </div>
+      {match ? (
+        <button className="nx-vs" onClick={open}>
+          {e.home === false ? oppSide : ownSide}
+          <span className="nx-time">
+            {e.time}
+            <small>{e.meetTime ? `Treffpunkt ${e.meetTime}` : formatDate(e.date)}</small>
           </span>
-          {e.location && (
-            <span>
-              <Icon name="pin" size={16} />
-              {e.location}
-            </span>
-          )}
-        </div>
-        {players.length > 0 && (
-          <>
-            <div className="roster-strip" aria-hidden="true">
-              {strip.map((p) => (
-                <span key={p.id} className={`st-${e.attendance[p.id] || 'none'}`} title={p.name} />
-              ))}
-            </div>
-            <div className="counts">
-              <span>
-                <span className="dot st-present" />
-                <b>{c.present}</b> dabei
-              </span>
-              <span>
-                <span className="dot st-unsure" />
-                <b>{c.unsure}</b> unsicher
-              </span>
-              <span>
-                <span className="dot st-absent" />
-                <b>{c.absent + c.excused + c.injured}</b> fehlen
-              </span>
-              <span>
-                <span className="dot st-none" />
-                <b>{c.none}</b> offen
-              </span>
-            </div>
-          </>
+          {e.home === false ? ownSide : oppSide}
+        </button>
+      ) : (
+        <button className="nx-plain" onClick={open}>
+          <span className="nx-title">{e.title || TYPE_LABEL[e.type]}</span>
+          <span className="nx-time">{e.time}</span>
+        </button>
+      )}
+      <div className="nx-meta">
+        <span>
+          <Icon name="calendar" size={15} />
+          {formatDate(e.date)}
+        </span>
+        {e.location && (
+          <span>
+            <Icon name="pin" size={15} />
+            {e.location}
+          </span>
         )}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => go({ tab: 'events', eventId: e.id })}>
-            <Icon name="check" size={18} />
-            Zusagen erfassen
-          </button>
-          <button className="btn btn-sm" onClick={onShare}>
-            <Icon name="share" size={18} />
-            In die Gruppe teilen
-          </button>
-        </div>
+      </div>
+      {players.length > 0 && <AttendanceBar c={c} />}
+      <div className="nx-actions">
+        <button className="btn btn-primary" onClick={open}>
+          Zusagen erfassen
+        </button>
+        <button className="btn btn-soft" onClick={onShare}>
+          <Icon name="share" size={18} />
+          Teilen
+        </button>
       </div>
     </div>
   );
