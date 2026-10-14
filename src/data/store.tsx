@@ -1,9 +1,9 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ClubSettings, DEFAULT_CLUB, Player, TeamData, TeamEvent } from '../types';
-import { Backend, SyncMeta, createLocalBackend } from './backend';
+import { Backend, SyncMeta, createDemoBackend } from './backend';
 import { byName } from '../lib/stats';
 
-type Mode = 'cloud' | 'local' | 'demo';
+type Mode = 'cloud' | 'demo';
 const MODE_KEY = 'teamtime2:mode';
 
 export type Phase = 'booting' | 'login' | 'ready';
@@ -30,7 +30,7 @@ interface StoreValue {
   deleteEvents: (ids: string[]) => Promise<void>;
   saveClub: (patch: Partial<ClubSettings>) => Promise<void>;
   replaceAll: (d: TeamData) => Promise<void>;
-  enterLocal: (demo?: boolean) => void;
+  enterDemo: () => void;
   enterCloud: () => void;
   signOut: () => Promise<void>;
 }
@@ -41,7 +41,10 @@ const EMPTY: TeamData = { players: [], events: [], club: DEFAULT_CLUB };
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<Mode | null>(() => {
     try {
-      return (localStorage.getItem(MODE_KEY) as Mode) || null;
+      const m = localStorage.getItem(MODE_KEY);
+      // Den früheren Modus „Nur auf diesem Gerät“ gibt es nicht mehr; die Daten
+      // bleiben gespeichert und lassen sich nach der Anmeldung übernehmen.
+      return m === 'cloud' || m === 'demo' ? m : null;
     } catch {
       return null;
     }
@@ -102,8 +105,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
     };
 
-    if (mode === 'local' || mode === 'demo') {
-      attach(createLocalBackend(mode));
+    if (mode === 'demo') {
+      attach(createDemoBackend());
     } else if (mode === 'cloud') {
       setPhase('booting');
       import('./firebase')
@@ -189,7 +192,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteEvents: (ids) => need().deleteEvents(ids),
     saveClub: (patch) => need().saveClub(patch),
     replaceAll: (d) => need().replaceAll(d),
-    enterLocal: (demo) => persistMode(demo ? 'demo' : 'local'),
+    enterDemo: () => persistMode('demo'),
     enterCloud: () => persistMode('cloud'),
     signOut,
   };

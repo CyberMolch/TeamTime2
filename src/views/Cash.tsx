@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
-import { CashEntry, DEFAULT_PENALTIES, Fine, PenaltyRule } from '../types';
-import { currentSeasonStart, formatDate, todayISO } from '../lib/dates';
+import { CashEntry, DEFAULT_PENALTIES, FeeSettings, Fine, PenaltyRule, Player } from '../types';
+import { currentSeasonStart, formatDate, formatDateNumeric, seasonLabel, todayISO } from '../lib/dates';
+import { feeFor, feeSummary, feesReceivedTotal, hasPaid, monthLabel, seasonMonths } from '../lib/fees';
+import { buildReport, savePDF, type Section } from '../lib/pdf';
 import { euro, fineBalance } from '../lib/stats';
-import { newId, saveFile, shareText, toCSV } from '../lib/native';
+import { haptic, newId, saveFile, shareText, toCSV } from '../lib/native';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Field, PageHead, Sheet, useDialog } from '../components/ui';
 
-type TabKey = 'fines' | 'players' | 'book' | 'catalog';
+type TabKey = 'fines' | 'players' | 'fees' | 'book' | 'catalog';
 
 export function CashView() {
   const { club, saveClub, players, allPlayers, playerById } = useStore();
@@ -22,9 +24,13 @@ export function CashView() {
   const catalog = club.penaltyCatalog?.length ? club.penaltyCatalog : DEFAULT_PENALTIES;
   const bal = fineBalance(fines);
   const bookSum = cashbook.reduce((s, c) => s + c.amount, 0);
-  const cash = bal.paid + bookSum;
+  const feesTotal = feesReceivedTotal(club.fees, allPlayers);
+  const cash = bal.paid + bookSum + feesTotal;
   const seasonStart = currentSeasonStart(club.seasonStart);
   const seasonIncome = fines.filter((f) => f.paid && (f.paidAt || f.date) >= seasonStart).reduce((s, f) => s + f.amount, 0);
+  const months = seasonMonths(seasonStart);
+  const feesOn = (club.fees?.amount || 0) > 0;
+  const fees = feeSummary(club.fees, players, months);
 
   const setFines = (next: Fine[]) => saveClub({ fines: next });
   const togglePaid = (f: Fine) => {
@@ -53,6 +59,77 @@ export function CashView() {
     if (r === 'copied') toast('Text kopiert – jetzt in WhatsApp einfügen.');
   };
 
+  const exportPDF = async () => {
+    const name = (pid: string) => playerById(pid)?.name || 'Unbekannt';
+    const openFines = fines.filter((f) => !f.paid).sort((a, b) => name(a.playerId).localeCompare(name(b.playerId), 'de'));
+    const seasonPaid = fines.filter((f) => f.paid && (f.paidAt || f.date) >= seasonStart).sort((a, b) => (a.paidAt || a.date).localeCompare(b.paidAt || b.date));
+    const pairs: [string, string][] = [
+      ['Kassenstand', euro(cash)],
+      ['davon bezahlte Strafen', euro(bal.paid)],
+    ];
+    if (feesOn || feesTotal) pairs.push(['davon Mitgliedsbeiträge', euro(feesTotal)]);
+    pairs.push(['davon Kassenbuch', euro(bookSum)], ['Offene Strafen', euro(bal.open)]);
+    if (feesOn) pairs.push([`Offene Beiträge (Saison ${seasonLabel(seasonStart)})`, euro(fees.open)]);
+    const sections: Section[] = [
+      { heading: 'Überblick', pairs },
+      {
+        heading: 'Offene Strafen',
+        columns: [
+          { title: 'Spieler', width: 3 },
+          { title: 'Grund', width: 4 },
+          { title: 'Datum', width: 2 },
+          { title: 'Betrag', width: 1.5, align: 'right' },
+        ],
+        rows: openFines.map((f) => [name(f.playerId), f.reason, formatDateNumeric(f.date), euro(f.amount)]),
+        footer: ['Summe', '', '', euro(bal.open)],
+      },
+      {
+        heading: `Bezahlte Strafen (Saison ${seasonLabel(seasonStart)})`,
+        columns: [
+          { title: 'Bezahlt am', width: 2 },
+          { title: 'Spieler', width: 3 },
+          { title: 'Grund', width: 4 },
+          { title: 'Betrag', width: 1.5, align: 'right' },
+        ],
+        rows: seasonPaid.map((f) => [formatDateNumeric(f.paidAt || f.date), name(f.playerId), f.reason, euro(f.amount)]),
+        footer: ['Summe', '', '', euro(seasonIncome)],
+      },
+    ];
+    if (feesOn)
+      sections.push({
+        heading: `Mitgliedsbeiträge (Saison ${seasonLabel(seasonStart)})`,
+        note: `Monatsbeitrag ${euro(club.fees!.amount)} · erwartet ${euro(fees.expected)} · eingegangen ${euro(fees.received)}`,
+        columns: [
+          { title: 'Spieler', width: 3 },
+          { title: 'Offene Monate', width: 5 },
+          { title: 'Offen', width: 1.5, align: 'right' },
+        ],
+        rows: Object.entries(fees.openBy)
+          .sort((a, b) => name(a[0]).localeCompare(name(b[0]), 'de'))
+          .map(([pid, o]) => [name(pid), o.months.map((m) => monthLabel(m)).join(', '), euro(o.amount)]),
+        footer: ['Summe', '', euro(fees.open)],
+      });
+    sections.push({
+      heading: 'Kassenbuch',
+      columns: [
+        { title: 'Datum', width: 2 },
+        { title: 'Beschreibung', width: 6 },
+        { title: 'Betrag', width: 1.5, align: 'right' },
+      ],
+      rows: [...cashbook].sort((a, b) => a.date.localeCompare(b.date)).map((c) => [formatDateNumeric(c.date), c.label, euro(c.amount)]),
+      footer: ['Summe', '', euro(bookSum)],
+    });
+    const bytes = await buildReport({
+      title: 'Kassenbericht',
+      subtitle: `Stand ${formatDateNumeric(todayISO())}`,
+      clubName: [club.clubName, club.teamName].filter(Boolean).join(' · '),
+      logo: club.clubLogoUrl || undefined,
+      sections,
+    });
+    await savePDF(`kassenbericht-${todayISO()}.pdf`, bytes);
+    toast('Kassenbericht erstellt.');
+  };
+
   const exportCSV = async () => {
     const rows: (string | number)[][] = [['Datum', 'Spieler', 'Grund', 'Betrag', 'Bezahlt', 'Bezahlt am']];
     [...fines].sort((a, b) => a.date.localeCompare(b.date)).forEach((f) => rows.push([f.date, playerById(f.playerId)?.name || '', f.reason, f.amount.toFixed(2).replace('.', ','), f.paid ? 'ja' : 'nein', f.paidAt || '']));
@@ -70,8 +147,11 @@ export function CashView() {
         title="Mannschaftskasse"
         actions={
           <>
-            <button className="btn" onClick={exportCSV}>
-              <Icon name="download" /> Export
+            <button className="btn" onClick={exportPDF}>
+              <Icon name="file" /> Bericht
+            </button>
+            <button className="btn btn-ghost" onClick={exportCSV} title="Als Tabelle für Excel">
+              <Icon name="download" /> Tabelle
             </button>
             <button className="btn btn-primary only-desktop" onClick={() => setAdding(null)}>
               <Icon name="plus" /> Strafe
@@ -79,19 +159,26 @@ export function CashView() {
           </>
         }
       />
-      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+      <div className="stats-row">
         <div className="stat">
           <div className="stat-value">{euro(cash)}</div>
           <div className="stat-label">Kassenstand</div>
         </div>
         <div className={'stat' + (bal.open ? ' stat-rose' : '')}>
           <div className="stat-value">{euro(bal.open)}</div>
-          <div className="stat-label">noch offen</div>
+          <div className="stat-label">Strafen offen</div>
         </div>
-        <div className="stat">
-          <div className="stat-value">{euro(seasonIncome)}</div>
-          <div className="stat-label">Strafen bezahlt (Saison)</div>
-        </div>
+        {feesOn ? (
+          <div className={'stat' + (fees.open ? ' stat-rose' : '')}>
+            <div className="stat-value">{euro(fees.open)}</div>
+            <div className="stat-label">Beiträge offen</div>
+          </div>
+        ) : (
+          <div className="stat">
+            <div className="stat-value">{euro(seasonIncome)}</div>
+            <div className="stat-label">Strafen bezahlt (Saison)</div>
+          </div>
+        )}
       </div>
 
       <div className="tabs section" role="tablist" style={{ marginTop: 20 }}>
@@ -99,6 +186,7 @@ export function CashView() {
           [
             ['fines', 'Strafen'],
             ['players', 'Pro Spieler'],
+            ['fees', 'Beiträge'],
             ['book', 'Kassenbuch'],
             ['catalog', 'Strafenkatalog'],
           ] as [TabKey, string][]
@@ -248,6 +336,8 @@ export function CashView() {
           )}
         </>
       )}
+
+      {tab === 'fees' && <FeesTab fees={club.fees} players={allPlayers.filter((p) => !p.inactive || club.fees?.paid?.[p.id]?.length)} months={months} onSave={(f) => saveClub({ fees: f })} />}
 
       {tab === 'catalog' && <CatalogEditor catalog={catalog} onSave={(c) => saveClub({ penaltyCatalog: c })} />}
 
@@ -441,5 +531,171 @@ function CatalogEditor({ catalog, onSave }: { catalog: PenaltyRule[]; onSave: (c
       </div>
       <p className="small muted">Änderungen am Katalog gelten nur für neue Strafen.</p>
     </div>
+  );
+}
+
+function FeesTab({ fees, players, months, onSave }: { fees?: FeeSettings; players: Player[]; months: string[]; onSave: (f: FeeSettings) => void }) {
+  const { toast } = useDialog();
+  const f: FeeSettings = fees || { amount: 0 };
+  const [amount, setAmount] = useState(f.amount ? String(f.amount).replace('.', ',') : '');
+  const [editPlayer, setEditPlayer] = useState<Player | null>(null);
+  const sum = feeSummary(f, players, months);
+
+  const saveAmount = () => {
+    const v = parseFloat(amount.replace(',', '.')) || 0;
+    if (v !== f.amount) {
+      onSave({ ...f, amount: Math.round(v * 100) / 100 });
+      toast(v ? `Monatsbeitrag: ${euro(v)}` : 'Beiträge ausgeschaltet.');
+    }
+  };
+  const toggle = (pid: string, m: string) => {
+    haptic();
+    const cur = f.paid?.[pid] || [];
+    const next = cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m].sort();
+    onSave({ ...f, paid: { ...(f.paid || {}), [pid]: next } });
+  };
+  const payUntilNow = (pid: string) => {
+    const cur = new Set(f.paid?.[pid] || []);
+    months.forEach((m) => cur.add(m));
+    onSave({ ...f, paid: { ...(f.paid || {}), [pid]: [...cur].sort() } });
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div className="panel panel-pad" style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <Field label="Monatsbeitrag in €" hint="0 oder leer = keine Beiträge">
+          <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d,.]/g, ''))} onBlur={saveAmount} style={{ width: 140 }} />
+        </Field>
+        {f.amount > 0 && (
+          <dl className="kv grow" style={{ minWidth: 220 }}>
+            <dt>Erwartet bis heute</dt>
+            <dd>{euro(sum.expected)}</dd>
+            <dt>Eingegangen</dt>
+            <dd>{euro(sum.received)}</dd>
+            <dt>Offen</dt>
+            <dd style={sum.open ? { color: 'var(--rose)' } : undefined}>{euro(sum.open)}</dd>
+          </dl>
+        )}
+      </div>
+
+      {f.amount > 0 && (
+        <>
+          <div className="table-wrap fee-grid">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th className="sticky-col">Spieler</th>
+                  {months.map((m) => (
+                    <th key={m} className="c">
+                      {monthLabel(m)}
+                    </th>
+                  ))}
+                  <th className="r">Offen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((p) => {
+                  const fee = feeFor(f, p.id);
+                  const open = sum.openBy[p.id]?.amount || 0;
+                  return (
+                    <tr key={p.id}>
+                      <td className="sticky-col name">
+                        <button className="fee-name" onClick={() => setEditPlayer(p)}>
+                          {p.name}
+                          <span className="small muted">{fee ? (f.custom?.[p.id] !== undefined ? ` · ${euro(fee)}` : '') : ' · befreit'}</span>
+                        </button>
+                      </td>
+                      {months.map((m) => {
+                        const paid = hasPaid(f, p.id, m);
+                        return (
+                          <td key={m} className="c">
+                            {fee ? (
+                              <button
+                                className={'fee-cell' + (paid ? ' paid' : '')}
+                                onClick={() => toggle(p.id, m)}
+                                aria-pressed={paid}
+                                aria-label={`${p.name} ${monthLabel(m, true)} ${paid ? 'bezahlt' : 'offen'}`}
+                              >
+                                {paid ? <Icon name="check" size={16} stroke={2.6} /> : null}
+                              </button>
+                            ) : (
+                              <span className="muted">–</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="r num" style={{ fontWeight: 700, color: open ? 'var(--rose)' : 'var(--muted)' }}>
+                        {open ? euro(open) : '–'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="small muted">Kästchen antippen = Monat bezahlt. Auf den Namen tippen für abweichenden Betrag oder Befreiung.</p>
+        </>
+      )}
+
+      {editPlayer && (
+        <FeePlayerSheet
+          player={editPlayer}
+          fees={f}
+          onClose={() => setEditPlayer(null)}
+          onPayAll={() => {
+            payUntilNow(editPlayer.id);
+            setEditPlayer(null);
+          }}
+          onSave={(next) => {
+            onSave(next);
+            setEditPlayer(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FeePlayerSheet({ player, fees, onClose, onSave, onPayAll }: { player: Player; fees: FeeSettings; onClose: () => void; onSave: (f: FeeSettings) => void; onPayAll: () => void }) {
+  const [exempt, setExempt] = useState(!!fees.exempt?.includes(player.id));
+  const [custom, setCustom] = useState(fees.custom?.[player.id] !== undefined ? String(fees.custom[player.id]).replace('.', ',') : '');
+  const save = () => {
+    const c = { ...(fees.custom || {}) };
+    const v = parseFloat(custom.replace(',', '.'));
+    if (custom.trim() && v >= 0) c[player.id] = v;
+    else delete c[player.id];
+    const ex = new Set(fees.exempt || []);
+    if (exempt) ex.add(player.id);
+    else ex.delete(player.id);
+    onSave({ ...fees, custom: c, exempt: [...ex] });
+  };
+  return (
+    <Sheet
+      title={player.name}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onPayAll}>
+            Alles bis heute bezahlt
+          </button>
+          <span className="spacer" />
+          <button className="btn btn-primary" onClick={save}>
+            Speichern
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: 'grid', gap: 14 }}>
+        <label className="check">
+          <input type="checkbox" checked={exempt} onChange={(e) => setExempt(e.target.checked)} />
+          Vom Beitrag befreit
+        </label>
+        {!exempt && (
+          <Field label="Abweichender Monatsbeitrag in €" hint={`Leer lassen für den normalen Beitrag (${euro(fees.amount)})`}>
+            <input inputMode="decimal" value={custom} onChange={(e) => setCustom(e.target.value.replace(/[^\d,.]/g, ''))} />
+          </Field>
+        )}
+      </div>
+    </Sheet>
   );
 }

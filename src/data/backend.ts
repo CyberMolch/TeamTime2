@@ -9,7 +9,7 @@ export interface SyncMeta {
 }
 
 export interface Backend {
-  kind: 'local' | 'demo' | 'cloud';
+  kind: 'demo' | 'cloud';
   /** z. B. E-Mail-Adresse des Kontos */
   account?: string;
   subscribe(cb: (d: TeamData, meta: SyncMeta) => void, onError: (e: unknown) => void): () => void;
@@ -21,9 +21,10 @@ export interface Backend {
   replaceAll(d: TeamData): Promise<void>;
 }
 
-/** Speichert alles im Browser bzw. in der App auf diesem Gerät. */
-export function createLocalBackend(kind: 'local' | 'demo'): Backend {
-  const key = `teamtime2:${kind}`;
+/** Beispielmannschaft zum Ausprobieren – liegt nur im Speicher dieses Geräts. */
+export function createDemoBackend(): Backend {
+  const kind = 'demo' as const;
+  const key = 'teamtime2:demo';
   const listeners = new Set<(d: TeamData, meta: SyncMeta) => void>();
 
   const read = (): TeamData => {
@@ -36,7 +37,7 @@ export function createLocalBackend(kind: 'local' | 'demo'): Backend {
     } catch {
       /* beschädigter Speicher → neu anfangen */
     }
-    const fresh = kind === 'demo' ? demoData() : { players: [], events: [], club: { ...DEFAULT_CLUB } };
+    const fresh = demoData();
     write(fresh);
     return fresh;
   };

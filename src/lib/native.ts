@@ -110,3 +110,36 @@ export function toCSV(rows: (string | number)[][]): string {
   // Semikolon + BOM: öffnet sich in deutschem Excel direkt richtig
   return '﻿' + rows.map((r) => r.map(esc).join(';')).join('\r\n');
 }
+
+/** Kurzes Antippen-Feedback (nur in der Android-App). */
+export function haptic(kind: 'light' | 'medium' = 'light') {
+  if (!isNative()) return;
+  import('@capacitor/haptics')
+    .then(({ Haptics, ImpactStyle }) => Haptics.impact({ style: kind === 'light' ? ImpactStyle.Light : ImpactStyle.Medium }))
+    .catch(() => {});
+}
+
+/** Statusleiste an Farbschema anpassen (nur in der Android-App). */
+export async function styleStatusBar(dark: boolean, color: string) {
+  if (!isNative()) return;
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar');
+    await StatusBar.setOverlaysWebView({ overlay: false });
+    await StatusBar.setBackgroundColor({ color });
+    // Helle Schrift: passt auf Vereinsgrün und auf den dunklen Modus
+    await StatusBar.setStyle({ style: Style.Dark });
+    void dark;
+  } catch {
+    /* ältere Geräte: egal */
+  }
+}
+
+export async function hideSplash() {
+  if (!isNative()) return;
+  try {
+    const { SplashScreen } = await import('@capacitor/splash-screen');
+    await SplashScreen.hide({ fadeOutDuration: 200 });
+  } catch {
+    /* egal */
+  }
+}

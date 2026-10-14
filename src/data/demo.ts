@@ -129,6 +129,22 @@ export function demoData(): TeamData {
         { id: 'c2', date: addDays(today, -12), label: 'Getränke nach dem Heimspiel', amount: -36.5 },
       ],
       jerseyRotation: players.map((p) => p.id),
+      fees: {
+        amount: 10,
+        exempt: ['d14'],
+        paid: Object.fromEntries(
+          players.map((p, i) => {
+            const months: string[] = [];
+            const d = new Date();
+            const back = i % 5 === 0 ? 1 : i % 3 === 0 ? 2 : 4;
+            for (let k = 0; k < 12; k++) {
+              const m = new Date(d.getFullYear(), d.getMonth() - k, 1);
+              if (k >= 4 - back + (i % 5 === 0 ? 2 : 0) && k < 4) months.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`);
+            }
+            return [p.id, months.sort()];
+          }),
+        ),
+      },
     },
   };
 }

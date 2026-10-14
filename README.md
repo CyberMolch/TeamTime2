@@ -14,10 +14,10 @@ Läuft im Browser am PC und als Android-App, beide mit denselben Daten.
 | Termine | Training, Punkt- und Testspiele, Treffen; Trainings als wöchentliche Serie; Absagen, Kopieren; Zusagen mit einem Tipp erfassen; Text für die WhatsApp-Gruppe |
 | Spiele | Ergebnis, Startelf und Bank, Tore, Vorlagen, Karten, wer die Trikots mitnimmt |
 | Kader | Spielerprofile mit Foto, Nummer, Position, Kontakt, Notizen; viele Spieler auf einmal per Namensliste; inaktive Spieler |
-| Auswertung | Anwesenheitsquoten (Saison, 8 Wochen, gesamt), Beteiligung pro Termin, Torschützenliste, Bilanz und Form; Export als Tabelle |
-| Kasse | Strafenkatalog, Strafen für mehrere Spieler auf einmal, „bezahlt“ mit Rückgängig, offene Beträge in die Gruppe schicken, Kassenbuch |
+| Auswertung | Anwesenheitsquoten (Saison, 8 Wochen, gesamt), Raster Spieler × Termine, Beteiligung pro Termin, Torschützenliste, Bilanz und Form; PDF-Bericht und Tabelle |
+| Kasse | Strafenkatalog, Strafen für mehrere Spieler auf einmal, Mitgliedsbeiträge pro Monat, „bezahlt“ mit Rückgängig, offene Beträge in die Gruppe schicken, Kassenbuch, Kassenbericht als PDF |
 | Trikots | Reihenfolge zum Waschen, Vorschlag fürs nächste Spiel, wer sie noch nicht zurückgebracht hat |
-| Einstellungen | Verein, Wappen, Saisonbeginn, hell/dunkel, Sicherung speichern und einspielen |
+| Einstellungen | Verein, Wappen, Saisonbeginn, hell/dunkel, Erinnerungen (Android), Kalender-Export, Kaderliste als PDF, Sicherung |
 
 Die App funktioniert auch ohne Netz (z. B. am Sportplatz) und gleicht Änderungen ab, sobald wieder Verbindung besteht.
 

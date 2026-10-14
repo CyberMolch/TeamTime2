@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, ReactNode, type TouchEvent, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon, IconName } from './Icon';
 import { AttendanceStatus, Player, STATUS_LABEL } from '../types';
 import { initials } from '../lib/stats';
@@ -54,10 +54,37 @@ export function Sheet({
     document.body.classList.add('no-scroll');
     return () => document.body.classList.remove('no-scroll');
   }, []);
+
+  // Auf dem Handy: am Kopf nach unten wischen schließt das Fenster
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ y0: number; dy: number } | null>(null);
+  const onTouchStart = (e: TouchEvent) => {
+    drag.current = { y0: e.touches[0].clientY, dy: 0 };
+  };
+  const onTouchMove = (e: TouchEvent) => {
+    if (!drag.current || !sheetRef.current) return;
+    const dy = Math.max(0, e.touches[0].clientY - drag.current.y0);
+    drag.current.dy = dy;
+    sheetRef.current.style.transform = `translateY(${dy}px)`;
+    sheetRef.current.style.transition = 'none';
+  };
+  const onTouchEnd = () => {
+    const el = sheetRef.current;
+    const d = drag.current;
+    drag.current = null;
+    if (!el || !d) return;
+    el.style.transition = 'transform .18s ease-out';
+    if (d.dy > 90) {
+      el.style.transform = 'translateY(100%)';
+      setTimeout(onClose, 160);
+    } else el.style.transform = '';
+  };
+
   return (
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={'sheet' + (wide ? ' sheet-wide' : '')} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
-        <header className="sheet-head">
+      <div ref={sheetRef} className={'sheet' + (wide ? ' sheet-wide' : '')} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+        <header className="sheet-head" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+          <span className="sheet-grip" aria-hidden="true" />
           <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Schließen">
             <Icon name="x" />

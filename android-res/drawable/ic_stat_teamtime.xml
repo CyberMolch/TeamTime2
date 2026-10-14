@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Benachrichtigungssymbol: Wappenschild, einfarbig (Android färbt es selbst ein) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4,3h16v9c0,4.6 -3.4,8.1 -8,9.5C7.4,20.1 4,16.6 4,12V3zM12,5v14.3c3.3,-1.2 6,-3.9 6,-7.3V5h-6z" />
+</vector>

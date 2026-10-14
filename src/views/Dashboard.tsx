@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { TYPE_LABEL, TeamEvent, isMatch } from '../types';
-import { addDays, currentSeasonStart, formatDate, isOver, nextBirthday, relativeDay, todayISO, weekdayLong } from '../lib/dates';
+import { addDays, currentSeasonStart, formatDate, isOver, nextBirthday, relativeDay, seasonLabel, todayISO, weekdayLong } from '../lib/dates';
 import { attendanceFor, countStatus, euro, fineBalance, matchRecord, pastEvents } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
 import { shareText } from '../lib/native';
@@ -63,10 +63,10 @@ export function Dashboard() {
     <>
       <div className="page-head">
         <div>
-          <h1>{greeting()}{club.coachName ? `, ${club.coachName.split(' ')[0]}` : ''}</h1>
-          <p className="page-sub">
-            {weekdayLong(today)}, {formatDate(today).split(', ')[1]}
+          <p className="eyebrow">
+            {weekdayLong(today)}, {formatDate(today).split(', ')[1]} · Saison {seasonLabel(seasonStart)}
           </p>
+          <h1>{club.teamName || 'Übersicht'}</h1>
         </div>
       </div>
 
@@ -106,7 +106,7 @@ export function Dashboard() {
         )
       )}
 
-      <div className="stats-row section" style={{ marginTop: 16 }}>
+      <div className="stats-row" style={{ marginTop: 16 }}>
         <button className="stat" onClick={() => go({ tab: 'stats' })}>
           <div className="stat-value">
             {record.win}–{record.draw}–{record.loss}
@@ -240,12 +240,6 @@ export function Dashboard() {
   );
 }
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 11) return 'Guten Morgen';
-  if (h < 18) return 'Hallo';
-  return 'Guten Abend';
-}
 
 function Kickoff({ e, onShare }: { e: TeamEvent; onShare: () => void }) {
   const { players } = useStore();

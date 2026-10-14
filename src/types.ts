@@ -106,8 +106,21 @@ export interface ClubSettings {
   fines?: Fine[];
   penaltyCatalog?: PenaltyRule[];
   cashbook?: CashEntry[];
+  // Mitgliedsbeiträge
+  fees?: FeeSettings;
   // Trikots
   jerseyRotation?: string[]; // Reihenfolge der Spieler-IDs
+}
+
+export interface FeeSettings {
+  /** Monatsbeitrag in Euro; 0 = Beiträge ausgeschaltet */
+  amount: number;
+  /** abweichender Betrag pro Spieler */
+  custom?: Record<string, number>;
+  /** Spieler, die nichts zahlen */
+  exempt?: string[];
+  /** bezahlte Monate je Spieler, z. B. { p1: ['2026-07', '2026-08'] } */
+  paid?: Record<string, string[]>;
 }
 
 export interface TeamData {

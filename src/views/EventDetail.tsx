@@ -5,20 +5,65 @@ import { AttendanceStatus, Fine, MatchStat, Player, STATUS_LABEL, TYPE_LABEL, Te
 import { formatDate, isOver, nowISOString, relativeDay, todayISO } from '../lib/dates';
 import { countStatus, euro, parseResult } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
-import { newId, shareText } from '../lib/native';
+import { haptic, newId, shareText } from '../lib/native';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Field, Sheet, StatusDot, useDialog } from '../components/ui';
 import { DateTile } from '../components/EventRow';
 import { EventForm } from '../components/EventForm';
 import { nextJerseyCandidate } from './Jerseys';
+import { exportCalendar } from '../lib/reminders';
 
-const QUICK: { st: AttendanceStatus; icon?: string; text?: string }[] = [
+const QUICK: { st: AttendanceStatus; icon: string }[] = [
   { st: 'present', icon: 'check' },
-  { st: 'unsure', text: '?' },
-  { st: 'excused', text: 'E' },
+  { st: 'unsure', icon: 'help' },
   { st: 'absent', icon: 'x' },
-  { st: 'injured', icon: 'medical' },
 ];
+const MORE_STATUS: { st: AttendanceStatus; icon: string; hint: string }[] = [
+  { st: 'present', icon: 'check', hint: 'Kommt' },
+  { st: 'unsure', icon: 'help', hint: 'Weiß noch nicht' },
+  { st: 'absent', icon: 'x', hint: 'Fehlt ohne Entschuldigung' },
+  { st: 'excused', icon: 'mail', hint: 'Hat rechtzeitig abgesagt' },
+  { st: 'injured', icon: 'medical', hint: 'Zählt nicht in die Quote' },
+];
+
+function AttendanceRow({ player, status, onSet, onMore }: { player: Player; status: AttendanceStatus; onSet: (st: AttendanceStatus) => void; onMore: () => void }) {
+  const special = status === 'excused' || status === 'injured';
+  return (
+    <div className={'att-row' + (status !== 'none' ? ` is-${status}` : '')}>
+      <span className="hide-sm">
+        <Avatar player={player} size={34} />
+      </span>
+      <span className="grow">
+        <span className="title ellipsis" style={{ display: 'block' }}>
+          {player.name}
+        </span>
+        <span className={'att-label' + (status === 'none' ? ' muted' : '')} style={status === 'none' ? undefined : { color: `var(--st-${status})` }}>
+          {status === 'none' ? 'Keine Rückmeldung' : STATUS_LABEL[status]}
+        </span>
+      </span>
+      <div className="att-buttons" role="group" aria-label={`Rückmeldung von ${player.name}`}>
+        {QUICK.map((q) => (
+          <button
+            key={q.st}
+            className={`att-btn st-${q.st}` + (status === q.st ? ' on' : '')}
+            onClick={() => {
+              haptic();
+              onSet(q.st);
+            }}
+            aria-pressed={status === q.st}
+            aria-label={STATUS_LABEL[q.st]}
+            title={STATUS_LABEL[q.st]}
+          >
+            <Icon name={q.icon} size={19} stroke={2.4} />
+          </button>
+        ))}
+        <button className={`att-btn att-more-btn st-${status}` + (special ? ' on' : '')} onClick={onMore} aria-label="Weitere Möglichkeiten" title="Entschuldigt, verletzt …">
+          <Icon name={status === 'excused' ? 'mail' : status === 'injured' ? 'medical' : 'more'} size={19} stroke={2.2} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function EventDetail({ id }: { id: string }) {
   const { events, players, allPlayers, club, saveEvent, saveEvents, deleteEvents } = useStore();
@@ -29,6 +74,7 @@ export function EventDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
   const [finesFor, setFinesFor] = useState(false);
+  const [moreFor, setMoreFor] = useState<Player | null>(null);
 
   if (!e)
     return (
@@ -213,42 +259,13 @@ export function EventDetail({ id }: { id: string }) {
             </div>
           ) : (
             <div className="list">
-              {roster.map((p) => {
-                const st = e.attendance[p.id] || 'none';
-                return (
-                  <div className="att-row" key={p.id}>
-                    <span className="hide-sm">
-                      <Avatar player={p} size={32} />
-                    </span>
-                    <span className="grow">
-                      <span className="title ellipsis" style={{ display: 'block', fontWeight: 600 }}>
-                        {p.name}
-                      </span>
-                      <span className="sub small" style={{ color: st === 'none' ? 'var(--muted)' : `var(--st-${st})`, fontWeight: 600 }}>
-                        {STATUS_LABEL[st]}
-                      </span>
-                    </span>
-                    <div className="att-buttons" role="group" aria-label={`Status für ${p.name}`}>
-                      {QUICK.map((q) => (
-                        <button
-                          key={q.st}
-                          className={`att-btn st-${q.st}` + (st === q.st ? ' on' : '')}
-                          onClick={() => setStatus(p.id, q.st)}
-                          aria-pressed={st === q.st}
-                          aria-label={STATUS_LABEL[q.st]}
-                          title={STATUS_LABEL[q.st]}
-                        >
-                          {q.icon ? <Icon name={q.icon} size={18} stroke={2.4} /> : <b className="num" style={{ fontSize: '1.05rem' }}>{q.text}</b>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              {roster.map((p) => (
+                <AttendanceRow key={p.id} player={p} status={e.attendance[p.id] || 'none'} onSet={(st) => setStatus(p.id, st)} onMore={() => setMoreFor(p)} />
+              ))}
             </div>
           )}
           <p className="small muted" style={{ marginTop: 10 }}>
-            Tippe erneut auf den markierten Knopf, um den Eintrag zu entfernen. E = entschuldigt, Kreuz = verletzt.
+            Nochmal tippen entfernt den Eintrag. „Entschuldigt“ und „verletzt“ findest du unter den drei Punkten.
           </p>
         </>
       ) : (
@@ -259,6 +276,16 @@ export function EventDetail({ id }: { id: string }) {
       {menu && (
         <Sheet title="Termin" onClose={() => setMenu(false)}>
           <div className="more-list">
+            <button
+              className="list-row"
+              onClick={async () => {
+                setMenu(false);
+                await exportCalendar([e], club.clubName, `termin-${e.date}.ics`);
+              }}
+            >
+              <Icon name="calendarPlus" />
+              <span className="grow">In den Kalender</span>
+            </button>
             <button className="list-row" onClick={duplicate}>
               <Icon name="copy" />
               <span className="grow">Kopieren</span>
@@ -271,6 +298,54 @@ export function EventDetail({ id }: { id: string }) {
               <Icon name="trash" />
               <span className="grow">Löschen</span>
             </button>
+          </div>
+        </Sheet>
+      )}
+      {moreFor && (
+        <Sheet title={moreFor.name} onClose={() => setMoreFor(null)}>
+          <div className="more-list">
+            {MORE_STATUS.map((m) => {
+              const on = (e.attendance[moreFor.id] || 'none') === m.st;
+              return (
+                <button
+                  key={m.st}
+                  className={'list-row' + (on ? ' row-on' : '')}
+                  onClick={() => {
+                    haptic();
+                    const next = { ...e.attendance, [moreFor.id]: m.st };
+                    saveEvent({ ...e, attendance: next });
+                    setMoreFor(null);
+                  }}
+                >
+                  <span className={`status-ico st-${m.st}`}>
+                    <Icon name={m.icon} size={18} stroke={2.4} />
+                  </span>
+                  <span className="grow">
+                    <span className="title" style={{ display: 'block' }}>
+                      {STATUS_LABEL[m.st]}
+                    </span>
+                    <span className="sub">{m.hint}</span>
+                  </span>
+                  {on && <Icon name="check" size={18} />}
+                </button>
+              );
+            })}
+            {e.attendance[moreFor.id] && e.attendance[moreFor.id] !== 'none' && (
+              <button
+                className="list-row"
+                onClick={() => {
+                  const next = { ...e.attendance };
+                  delete next[moreFor.id];
+                  saveEvent({ ...e, attendance: next });
+                  setMoreFor(null);
+                }}
+              >
+                <span className="status-ico st-none">
+                  <Icon name="x" size={18} />
+                </span>
+                <span className="grow title">Eintrag entfernen</span>
+              </button>
+            )}
           </div>
         </Sheet>
       )}

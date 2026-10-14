@@ -4,7 +4,7 @@ import { isNative } from '../lib/native';
 import { Field } from '../components/ui';
 
 export function Login() {
-  const { enterCloud, enterLocal, error: storeError } = useStore();
+  const { enterCloud, enterDemo, error: storeError } = useStore();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -107,12 +107,9 @@ export function Login() {
             )}
           </div>
 
-          <div className="divider">ohne Konto</div>
-          <button className="btn btn-block" onClick={() => enterLocal(true)}>
+          <div className="divider">oder erst einmal schauen</div>
+          <button className="btn btn-block" onClick={enterDemo}>
             Mit Beispielmannschaft ausprobieren
-          </button>
-          <button className="btn btn-ghost btn-block" onClick={() => enterLocal(false)}>
-            Nur auf diesem Gerät nutzen
           </button>
         </div>
       </section>

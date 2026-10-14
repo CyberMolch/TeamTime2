@@ -74,6 +74,7 @@ jobs:
         run: |
           npx cap add android
           npx capacitor-assets generate --android
+          cp -r android-res/* android/app/src/main/res/
           npx cap sync android
 
       - name: Versionsnummer setzen

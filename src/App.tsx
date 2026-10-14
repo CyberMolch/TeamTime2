@@ -3,7 +3,8 @@ import { useStore } from './data/store';
 import { NavCtx, Route, TABS, Tab } from './nav';
 import { Icon } from './components/Icon';
 import { handleBack, Sheet } from './components/ui';
-import { onAndroidBack } from './lib/native';
+import { hideSplash, onAndroidBack, styleStatusBar } from './lib/native';
+import { onReminderTap, scheduleReminders } from './lib/reminders';
 import { Login } from './views/Login';
 import { Dashboard } from './views/Dashboard';
 import { EventsView } from './views/Events';
@@ -21,7 +22,9 @@ function useTheme(theme?: string) {
     if (theme === 'dark' || theme === 'light') root.dataset.theme = theme;
     else delete root.dataset.theme;
     const dark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#0d1a14' : '#0a6b3a');
+    const color = dark ? '#13231b' : '#0a6b3a';
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', color);
+    styleStatusBar(dark, color);
   }, [theme]);
 }
 
@@ -36,6 +39,17 @@ export function App() {
   stackRef.current = stack;
   const [moreOpen, setMoreOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (phase !== 'booting') hideSplash();
+  }, [phase]);
+
+  // Erinnerungen bei jeder Änderung an Terminen oder Zusagen neu planen (nur in der App)
+  useEffect(() => {
+    if (phase !== 'ready' || store.backend?.kind !== 'cloud') return;
+    const t = setTimeout(() => scheduleReminders(store.events, store.players).catch(console.warn), 1500);
+    return () => clearTimeout(t);
+  }, [phase, store.events, store.players, store.backend]);
 
   const go = useCallback((r: Route) => {
     setStack((s) => {
@@ -55,6 +69,15 @@ export function App() {
     setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
   }, []);
 
+  // Tippen auf eine Erinnerung öffnet den Termin
+  useEffect(() => {
+    let off = () => {};
+    onReminderTap((id) => go({ tab: 'events', eventId: id }))
+      .then((f) => (off = f))
+      .catch(() => {});
+    return () => off();
+  }, [go]);
+
   // Android-Zurück-Taste: erst Fenster schließen, dann eine Seite zurück, sonst App minimieren
   useEffect(() => {
     let off = () => {};
@@ -65,7 +88,9 @@ export function App() {
         return true;
       }
       return false;
-    }).then((f) => (off = f));
+    })
+      .then((f) => (off = f))
+      .catch(() => {});
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && handleBack();
     window.addEventListener('keydown', esc);
     return () => {
@@ -76,8 +101,10 @@ export function App() {
 
   if (phase === 'booting')
     return (
-      <div className="boot">
-        <img src="./wappen.png" alt="" />
+      <div className="boot" role="status" aria-label="TeamTime wird geladen">
+        <img src={club.clubLogoUrl || './wappen.png'} alt="" />
+        <strong>TeamTime</strong>
+        <span className="boot-bar" />
       </div>
     );
   if (phase === 'login' || !store.backend) return <Login />;
@@ -144,7 +171,9 @@ export function App() {
               {store.error}
             </div>
           )}
-          {page}
+          <div className="page" key={JSON.stringify(route)}>
+            {page}
+          </div>
         </main>
 
         <nav className="bottomnav" aria-label="Hauptnavigation">
@@ -186,10 +215,6 @@ function SyncBadge({ compact }: { compact?: boolean }) {
   if (backend?.kind === 'demo') {
     icon = 'info';
     text = 'Demo';
-    tone = 'info';
-  } else if (backend?.kind === 'local') {
-    icon = 'cloudOff';
-    text = 'Nur auf diesem Gerät';
     tone = 'info';
   } else if (!online) {
     icon = 'cloudOff';

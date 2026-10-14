@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../data/store';
 import { ClubSettings, TeamData } from '../types';
-import { todayISO } from '../lib/dates';
+import { formatDateNumeric, isOver, todayISO } from '../lib/dates';
 import { isNative, pickFile, pickImage, saveFile } from '../lib/native';
+import { exportCalendar, loadReminderPrefs, ReminderPrefs, requestNotificationPermission, saveReminderPrefs, scheduleReminders } from '../lib/reminders';
+import { buildReport, savePDF } from '../lib/pdf';
 import { Icon } from '../components/Icon';
 import { Field, PageHead, Segmented, useDialog } from '../components/ui';
 
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.1';
 export const REPO_URL = 'https://github.com/CyberMolch/TeamTime2';
 export const WEB_URL = 'https://cybermolch.github.io/TeamTime2/';
 
 export function SettingsView() {
-  const { club, saveClub, backend, data, signOut, replaceAll } = useStore();
+  const { club, saveClub, backend, data, signOut, replaceAll, events, allPlayers } = useStore();
   const { toast, confirm } = useDialog();
   const [form, setForm] = useState<ClubSettings>(club);
   useEffect(() => setForm(club), [club]);
@@ -53,13 +55,39 @@ export function SettingsView() {
     toast('Sicherung eingespielt.');
   };
 
+  const rosterPDF = async () => {
+    const list = allPlayers.filter((p) => !p.inactive);
+    const bytes = await buildReport({
+      title: 'Kaderliste',
+      subtitle: `${list.length} Spieler · Stand ${formatDateNumeric(todayISO())}`,
+      clubName: [club.clubName, club.teamName].filter(Boolean).join(' · '),
+      logo: club.clubLogoUrl || undefined,
+      sections: [
+        {
+          columns: [
+            { title: 'Nr.', width: 0.8, align: 'right' },
+            { title: 'Name', width: 4 },
+            { title: 'Position', width: 2 },
+            { title: 'Geburtsdatum', width: 2 },
+            { title: 'Telefon', width: 2.6 },
+          ],
+          rows: [...list]
+            .sort((a, b) => (Number(a.jerseyNumber) || 999) - (Number(b.jerseyNumber) || 999) || a.name.localeCompare(b.name, 'de'))
+            .map((p) => [p.jerseyNumber || '', p.name, p.position || '', p.birthDate ? formatDateNumeric(p.birthDate) : '', p.phone || '']),
+        },
+      ],
+    });
+    await savePDF(`kaderliste-${todayISO()}.pdf`, bytes);
+    toast('Kaderliste erstellt.');
+  };
+
   return (
     <>
       <PageHead title="Einstellungen" />
       <div className="grid-2">
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div className="stack">
           <section className="panel panel-pad">
-            <h2 style={{ marginBottom: 14 }}>Verein & Mannschaft</h2>
+            <h2 className="panel-title">Verein & Mannschaft</h2>
             <div className="form-grid">
               <div className="full" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <img src={form.clubLogoUrl || './wappen.png'} alt="Vereinswappen" style={{ width: 56, height: 64, objectFit: 'contain' }} />
@@ -92,7 +120,7 @@ export function SettingsView() {
               <Field label="Heimspielstätte" hint="Wird bei neuen Terminen vorgeschlagen">
                 <input value={form.defaultLocation || ''} onChange={(e) => set({ defaultLocation: e.target.value })} onBlur={blurSave('defaultLocation')} />
               </Field>
-              <Field label="Saison beginnt im" hint="Für Auswertung und Bilanz">
+              <Field label="Saison beginnt im" hint="Für Auswertung, Bilanz und Beiträge">
                 <select value={seasonMonth} onChange={(e) => commit({ seasonStart: `2000-${String(e.target.value).padStart(2, '0')}-01` })}>
                   {['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'].map((m, i) => (
                     <option key={m} value={i + 1}>
@@ -104,8 +132,63 @@ export function SettingsView() {
             </div>
           </section>
 
+          <RemindersPanel />
+
           <section className="panel panel-pad">
-            <h2 style={{ marginBottom: 14 }}>Darstellung</h2>
+            <h2 className="panel-title">Berichte & Daten</h2>
+            <div className="settings-rows">
+              <div className="settings-row">
+                <div className="grow">
+                  <b>Kaderliste als PDF</b>
+                  <p className="small muted">Nummer, Name, Position, Geburtsdatum, Telefon</p>
+                </div>
+                <button className="btn btn-sm" onClick={rosterPDF}>
+                  <Icon name="file" size={18} /> Erstellen
+                </button>
+              </div>
+              <div className="settings-row">
+                <div className="grow">
+                  <b>Termine für den Kalender</b>
+                  <p className="small muted">Alle anstehenden Termine als Kalenderdatei (.ics)</p>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    await exportCalendar(
+                      events.filter((e) => !isOver(e.date, e.time)),
+                      [club.clubName, club.teamName].filter(Boolean).join(' '),
+                    );
+                    toast('Kalenderdatei erstellt – öffne sie mit deinem Kalender.');
+                  }}
+                >
+                  <Icon name="calendarPlus" size={18} /> Exportieren
+                </button>
+              </div>
+              <div className="settings-row">
+                <div className="grow">
+                  <b>Sicherung</b>
+                  <p className="small muted">Kader, Termine, Kasse und Einstellungen als Datei</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-sm" onClick={exportBackup}>
+                    <Icon name="download" size={18} /> Speichern
+                  </button>
+                  <button className="btn btn-sm btn-ghost" onClick={importBackup}>
+                    <Icon name="upload" size={18} /> Einspielen
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="small muted" style={{ marginTop: 10 }}>
+              Anwesenheits- und Kassenberichte findest du direkt unter „Auswertung“ und „Kasse“.
+            </p>
+          </section>
+        </div>
+
+        <div className="stack">
+          <AccountPanel />
+          <section className="panel panel-pad">
+            <h2 className="panel-title">Darstellung</h2>
             <Segmented
               label="Farbschema"
               value={form.theme || 'system'}
@@ -117,32 +200,13 @@ export function SettingsView() {
               ]}
             />
           </section>
-
           <section className="panel panel-pad">
-            <h2 style={{ marginBottom: 6 }}>Daten sichern</h2>
-            <p className="small muted" style={{ marginBottom: 12 }}>
-              Die Sicherung enthält Kader, Termine, Kasse und Einstellungen als Datei. Damit kannst du auch Daten von „Nur auf diesem Gerät“ in ein Konto umziehen.
-            </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn" onClick={exportBackup}>
-                <Icon name="download" /> Sicherung speichern
-              </button>
-              <button className="btn" onClick={importBackup}>
-                <Icon name="upload" /> Sicherung einspielen
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <div style={{ display: 'grid', gap: 16 }}>
-          <AccountPanel />
-          <section className="panel panel-pad">
-            <h2 style={{ marginBottom: 10 }}>App</h2>
+            <h2 className="panel-title">App</h2>
             <dl className="kv">
               <dt>Version</dt>
               <dd>{APP_VERSION}</dd>
-              <dt>Speicherort</dt>
-              <dd>{backend?.kind === 'cloud' ? 'Firebase (mit Konto)' : backend?.kind === 'demo' ? 'Demo auf diesem Gerät' : 'Nur auf diesem Gerät'}</dd>
+              <dt>Daten</dt>
+              <dd>{backend?.kind === 'cloud' ? 'In deinem Konto, auf allen Geräten gleich' : 'Beispielmannschaft auf diesem Gerät'}</dd>
             </dl>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
               {isNative() ? (
@@ -156,14 +220,95 @@ export function SettingsView() {
               )}
             </div>
           </section>
-          {backend?.kind !== 'cloud' && (
+          {backend?.kind === 'demo' && (
             <button className="btn btn-block" onClick={signOut}>
-              <Icon name="logout" /> {backend?.kind === 'demo' ? 'Demo beenden' : 'Zur Anmeldung'}
+              <Icon name="logout" /> Demo beenden und anmelden
             </button>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+function RemindersPanel() {
+  const { events, players, backend } = useStore();
+  const { toast } = useDialog();
+  const [prefs, setPrefs] = useState<ReminderPrefs>(loadReminderPrefs);
+  const [count, setCount] = useState<number | null>(null);
+  const native = isNative();
+
+  const update = async (patch: Partial<ReminderPrefs>) => {
+    let next = { ...prefs, ...patch };
+    if (patch.enabled) {
+      const ok = await requestNotificationPermission();
+      if (!ok) {
+        toast('Benachrichtigungen sind für TeamTime nicht erlaubt. Erlaube sie in den Android-Einstellungen.');
+        next = { ...next, enabled: false };
+      }
+    }
+    setPrefs(next);
+    saveReminderPrefs(next);
+    if (backend?.kind === 'cloud') {
+      const n = await scheduleReminders(events, players, next).catch(() => 0);
+      setCount(n);
+    }
+  };
+
+  return (
+    <section className="panel panel-pad">
+      <h2 className="panel-title">Erinnerungen</h2>
+      {!native ? (
+        <p className="small muted">
+          Erinnerungen vor Trainings und Spielen bekommst du in der Android-App aufs Handy. Für deinen Kalender am PC nutze unten „Termine für den Kalender“.
+        </p>
+      ) : (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <label className="switch-row">
+            <span className="grow">
+              <b>Vor jedem Termin erinnern</b>
+              <span className="small muted" style={{ display: 'block' }}>
+                Mit Stand der Zusagen, z. B. „12 dabei · 4 ohne Rückmeldung“
+              </span>
+            </span>
+            <input type="checkbox" className="switch" checked={prefs.enabled} onChange={(e) => update({ enabled: e.target.checked })} />
+          </label>
+          {prefs.enabled && (
+            <>
+              <Segmented
+                label="Zeitpunkt"
+                value={prefs.when}
+                onChange={(v) => update({ when: v })}
+                options={[
+                  { value: 'eve', label: 'Am Vorabend' },
+                  { value: 'before', label: 'Am selben Tag' },
+                ]}
+              />
+              {prefs.when === 'eve' ? (
+                <Field label="Uhrzeit am Vortag">
+                  <input type="time" value={prefs.time} onChange={(e) => e.target.value && update({ time: e.target.value })} style={{ maxWidth: 160 }} />
+                </Field>
+              ) : (
+                <Field label="Wie viele Stunden vorher?">
+                  <select value={prefs.hoursBefore} onChange={(e) => update({ hoursBefore: Number(e.target.value) })} style={{ maxWidth: 160 }}>
+                    {[1, 2, 3, 4, 6].map((h) => (
+                      <option key={h} value={h}>
+                        {h} Stunde{h > 1 ? 'n' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              <label className="check">
+                <input type="checkbox" checked={prefs.onlyOpen} onChange={(e) => update({ onlyOpen: e.target.checked })} />
+                Nur erinnern, wenn noch Rückmeldungen fehlen
+              </label>
+              {count !== null && <p className="small muted">{count ? `${count} Erinnerungen für die nächsten 30 Tage geplant.` : 'Gerade keine Erinnerung geplant.'}</p>}
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -182,15 +327,13 @@ function AccountPanel() {
   if (backend?.kind !== 'cloud') {
     return (
       <section className="panel panel-pad">
-        <h2 style={{ marginBottom: 6 }}>Konto</h2>
-        <p className="small muted">
-          Du nutzt TeamTime ohne Konto. Die Daten liegen nur auf diesem Gerät. Mit einem Konto siehst du dieselben Daten am PC und auf dem Handy.
-        </p>
+        <h2 className="panel-title">Konto</h2>
+        <p className="small muted">Du schaust dir gerade die Beispielmannschaft an. Mit einem Konto siehst du deine eigenen Daten am PC und auf dem Handy.</p>
       </section>
     );
   }
 
-  // Daten, die vorher ohne Konto auf diesem Gerät erfasst wurden
+  // Daten aus dem früheren Modus „ohne Konto“ auf diesem Gerät
   let localData: TeamData | null = null;
   try {
     const raw = localStorage.getItem('teamtime2:local');
@@ -218,9 +361,9 @@ function AccountPanel() {
 
   return (
     <section className="panel panel-pad">
-      <h2 style={{ marginBottom: 6 }}>Konto</h2>
+      <h2 className="panel-title">Konto</h2>
       <p className="small muted" style={{ marginBottom: 12 }}>
-        Angemeldet als <b style={{ color: 'var(--ink)' }}>{backend.account}</b>. Alle Änderungen werden automatisch abgeglichen, auch wenn du zwischendurch offline bist.
+        Angemeldet als <b style={{ color: 'var(--ink)' }}>{backend.account}</b>. Änderungen werden automatisch abgeglichen, auch wenn du zwischendurch offline bist.
       </p>
       {hasPw === false && (
         <div className="banner banner-info" style={{ display: 'grid', gap: 10 }}>
@@ -239,7 +382,7 @@ function AccountPanel() {
       {localData && (
         <div className="banner banner-info" style={{ display: 'grid', gap: 10 }}>
           <span>
-            Auf diesem Gerät liegen noch Daten von früher ohne Konto ({localData.players.length} Spieler, {localData.events.length} Termine).
+            Auf diesem Gerät liegen noch Daten aus der Zeit ohne Konto ({localData.players.length} Spieler, {localData.events.length} Termine).
           </span>
           <button
             className="btn btn-sm"
