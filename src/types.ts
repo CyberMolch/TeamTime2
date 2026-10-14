@@ -24,11 +24,22 @@ export interface Player {
   notes?: string;
   tags?: string[];
   inactive?: boolean;
+  /** Offizielle Saisonwerte, z. B. von fussball.de eingespielt */
+  ext?: ExternalStats;
   // Altfelder der ersten Version (werden nicht mehr gepflegt, nur toleriert)
   attendanceRate?: number;
   attended?: number;
   total?: number;
   status?: AttendanceStatus;
+}
+
+export interface ExternalStats {
+  season: string; // z. B. "2026/27"
+  source: string; // z. B. "fussball.de"
+  apps?: number;
+  minutes?: number;
+  goals?: number;
+  updatedAt: string; // YYYY-MM-DD
 }
 
 export interface MatchStat {

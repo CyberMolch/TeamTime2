@@ -2075,3 +2075,27 @@ thead .sticky-col {
   background: var(--green-soft);
   color: var(--green-ink);
 }
+
+/* Offizielle Saisonwerte */
+.ext-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ext-stats div {
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+.ext-stats b {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ext-stats span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}

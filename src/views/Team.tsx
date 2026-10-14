@@ -6,6 +6,7 @@ import { attendanceFor, pastEvents } from '../lib/stats';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, PageHead } from '../components/ui';
 import { BulkAddPlayers, PlayerForm, POSITIONS } from '../components/PlayerForm';
+import { RosterImport } from '../components/RosterImport';
 
 export function TeamView() {
   const { allPlayers, events, club } = useStore();
@@ -15,6 +16,7 @@ export function TeamView() {
   const [showInactive, setShowInactive] = useState(false);
   const [adding, setAdding] = useState(false);
   const [bulk, setBulk] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const season = useMemo(() => pastEvents(events, { from: currentSeasonStart(club.seasonStart) }), [events, club.seasonStart]);
   const inactiveCount = allPlayers.filter((p) => p.inactive).length;
@@ -36,6 +38,9 @@ export function TeamView() {
             <button className="btn" onClick={() => setBulk(true)}>
               <Icon name="list" /> Mehrere
             </button>
+            <button className="btn" onClick={() => setImporting(true)}>
+              <Icon name="upload" /> Kader einspielen
+            </button>
             <button className="btn btn-primary only-desktop" onClick={() => setAdding(true)}>
               <Icon name="plus" /> Spieler
             </button>
@@ -50,8 +55,8 @@ export function TeamView() {
             title="Noch keine Spieler"
             action={
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <button className="btn btn-primary" onClick={() => setBulk(true)}>
-                  Namensliste einfügen
+                <button className="btn btn-primary" onClick={() => setImporting(true)}>
+                  Kader einspielen
                 </button>
                 <button className="btn" onClick={() => setAdding(true)}>
                   Einzeln hinzufügen
@@ -96,7 +101,15 @@ export function TeamView() {
                         {p.name}
                       </span>
                       <span className="sub" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {[p.jerseyNumber && `#${p.jerseyNumber}`, p.position, p.inactive && 'inaktiv'].filter(Boolean).join(' · ') || 'Keine Angaben'}
+                        {[
+                          p.jerseyNumber && `#${p.jerseyNumber}`,
+                          p.position,
+                          p.ext?.apps !== undefined && `${p.ext.apps} ${p.ext.apps === 1 ? 'Spiel' : 'Spiele'}`,
+                          p.ext?.goals ? `${p.ext.goals} ${p.ext.goals === 1 ? 'Tor' : 'Tore'}` : null,
+                          p.inactive && 'inaktiv',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || 'Keine Angaben'}
                         {p.tags?.filter(Boolean).slice(0, 2).map((t) => (
                           <span key={t} className="tag">
                             {t}
@@ -129,6 +142,7 @@ export function TeamView() {
       </button>
       {adding && <PlayerForm onClose={() => setAdding(false)} />}
       {bulk && <BulkAddPlayers onClose={() => setBulk(false)} />}
+      {importing && <RosterImport onClose={() => setImporting(false)} />}
     </>
   );
 }

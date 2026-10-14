@@ -45,6 +45,9 @@ export function StatsView() {
     [players, allInRange, range],
   );
 
+  const official = players
+    .filter((p) => p.ext && (p.ext.apps !== undefined || p.ext.goals !== undefined))
+    .sort((a, b) => (b.ext!.goals ?? 0) - (a.ext!.goals ?? 0) || (b.ext!.minutes ?? 0) - (a.ext!.minutes ?? 0));
   const record = matchRecord(allInRange);
   const avg = evs.length ? Math.round((evs.reduce((s, e) => s + countStatus(e, players).present, 0) / evs.length) * 10) / 10 : null;
   const teamRate = (() => {
@@ -116,6 +119,41 @@ export function StatsView() {
     toast('Bericht erstellt.');
   };
 
+  const officialTable = official.length > 0 && (
+                <section className="section">
+                  <div className="section-head">
+                    <h2>Einsätze & Tore</h2>
+                    <span className="small muted">
+                      Saison {official[0].ext!.season} laut {official[0].ext!.source}
+                    </span>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th className="rank">#</th>
+                          <th>Spieler</th>
+                          <th className="r">Einsätze</th>
+                          <th className="r">Minuten</th>
+                          <th className="r">Tore</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {official.map((p, i) => (
+                          <tr key={p.id} onClick={() => go({ tab: 'team', playerId: p.id })} style={{ cursor: 'pointer' }}>
+                            <td className="rank">{i + 1}</td>
+                            <td className="name">{p.name}</td>
+                            <td className="r">{p.ext!.apps ?? '–'}</td>
+                            <td className="r">{p.ext!.minutes ?? '–'}</td>
+                            <td className="r num strong">{p.ext!.goals ?? '–'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              );
+
   const sortBtn = (k: SortKey, label: string, cls = 'r') => (
     <th className={cls}>
       <button onClick={() => setSort(k)} style={{ fontWeight: sort === k ? 700 : 600, color: sort === k ? 'var(--ink)' : undefined }}>
@@ -165,11 +203,14 @@ export function StatsView() {
       </div>
 
       {evs.length === 0 ? (
+        <>
         <div className="panel">
           <Empty icon="chart" title="Noch nichts auszuwerten">
             Sobald vergangene Termine Zusagen haben, siehst du hier Quoten, Torschützen und die Bilanz.
           </Empty>
         </div>
+        {officialTable}
+        </>
       ) : (
         <>
           <div className="tabs" role="tablist">
@@ -239,9 +280,11 @@ export function StatsView() {
                 <ParticipationChart events={evs} players={players} onOpen={(id) => go({ tab: 'events', eventId: id })} />
               </section>
 
+              {officialTable}
+
               <section className="section">
                 <div className="section-head">
-                  <h2>Torschützen & Karten</h2>
+                  <h2>{official.length ? 'In der App erfasst' : 'Torschützen & Karten'}</h2>
                   {range !== 'all' && <span className="small muted">nur in der App erfasste Spiele</span>}
                 </div>
                 {scorers.length === 0 ? (

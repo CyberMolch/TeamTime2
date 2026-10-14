@@ -131,10 +131,19 @@ export function PlayerDetail({ id }: { id: string }) {
           <div className="stat-label">Termine in Folge dabei</div>
         </div>
         <div className="stat">
-          <div className="stat-value">
-            {sc.goals} <span className="muted" style={{ fontSize: '1.2rem' }}>/ {sc.assists}</span>
-          </div>
-          <div className="stat-label">Tore / Vorlagen</div>
+          {p.ext?.goals !== undefined && range === 'season' && !sc.goals && !sc.assists ? (
+            <>
+              <div className="stat-value">{p.ext.goals}</div>
+              <div className="stat-label">Tore laut {p.ext.source}</div>
+            </>
+          ) : (
+            <>
+              <div className="stat-value">
+                {sc.goals} <span className="muted" style={{ fontSize: '1.2rem' }}>/ {sc.assists}</span>
+              </div>
+              <div className="stat-label">Tore / Vorlagen</div>
+            </>
+          )}
         </div>
         <div className="stat">
           <div className="stat-value">
@@ -195,6 +204,31 @@ export function PlayerDetail({ id }: { id: string }) {
           </section>
         </div>
         <div style={{ display: 'grid', gap: 16 }}>
+          {p.ext && (
+            <div className="panel panel-pad">
+              <h3 style={{ marginBottom: 10 }}>
+                Saison {p.ext.season} <span className="muted" style={{ fontWeight: 500 }}>· {p.ext.source}</span>
+              </h3>
+              <div className="ext-stats">
+                <div>
+                  <b>{p.ext.apps ?? '–'}</b>
+                  <span>Einsätze</span>
+                </div>
+                <div>
+                  <b>{p.ext.minutes ?? '–'}</b>
+                  <span>Minuten</span>
+                </div>
+                <div>
+                  <b>{p.ext.goals ?? '–'}</b>
+                  <span>Tore</span>
+                </div>
+              </div>
+              <p className="small muted" style={{ marginTop: 10 }}>
+                Stand {formatDateNumeric(p.ext.updatedAt)}
+                {p.ext.apps && p.ext.minutes ? ` · Ø ${Math.round(p.ext.minutes / p.ext.apps)} Minuten pro Spiel` : ''}
+              </p>
+            </div>
+          )}
           <button className="panel panel-pad" style={{ textAlign: 'left' }} onClick={() => go({ tab: 'cash' })}>
             <h3 style={{ marginBottom: 8 }}>Kasse</h3>
             <dl className="kv">
