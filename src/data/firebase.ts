@@ -85,6 +85,10 @@ export function authErrorText(e: any): string {
     'auth/too-many-requests': 'Zu viele Versuche. Warte kurz und probiere es dann erneut.',
     'auth/network-request-failed': 'Keine Internetverbindung.',
     'auth/popup-closed-by-user': 'Anmeldung abgebrochen.',
+    'auth/cancelled-popup-request': 'Anmeldung abgebrochen.',
+    'auth/internal-error': 'Firebase hat die Anmeldung abgelehnt. Meist ist die Anmeldemethode nicht aktiviert oder die Adresse nicht freigegeben.',
+    'auth/admin-restricted-operation': 'Neue Konten sind in Firebase gesperrt (Authentication → Einstellungen → Nutzeraktionen).',
+    'auth/configuration-not-found': 'In Firebase ist die Anmeldung (Authentication) noch nicht eingerichtet.',
     'auth/popup-blocked': 'Der Browser hat das Anmeldefenster blockiert. Erlaube Pop-ups für diese Seite.',
     'auth/unauthorized-domain':
       'Diese Adresse ist in Firebase noch nicht freigegeben. Trage sie unter Authentication → Einstellungen → Autorisierte Domains ein.',
@@ -93,7 +97,12 @@ export function authErrorText(e: any): string {
     'auth/requires-recent-login': 'Bitte melde dich einmal ab und wieder an, dann klappt es.',
     'auth/credential-already-in-use': 'Diese E-Mail ist bereits mit einem anderen Konto verbunden.',
   };
-  return map[code] || e?.message || 'Unbekannter Fehler.';
+  const msg = String(e?.message || '');
+  if (code.startsWith('auth/requests-from-referer') || msg.includes('referer') || code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.')
+    return `Der Firebase-Schlüssel lässt Anmeldungen von dieser Adresse nicht zu (${code || 'Schlüssel gesperrt'}). Er muss in der Google Cloud Console für cybermolch.github.io freigegeben werden.`;
+  const text = map[code] || msg || 'Unbekannter Fehler.';
+  // Fehlercode immer mit anzeigen – hilft bei der Fehlersuche
+  return code && !text.includes(code) ? `${text} (${code})` : text;
 }
 
 // ---------- Daten ----------
