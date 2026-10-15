@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { EventType, Player, STATUS_LABEL, TeamEvent, isMatch } from '../types';
+import { EventType, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { addDays, currentSeasonStart, formatDate, formatDateNumeric, parseDate, seasonLabel, todayISO, weekdayShort } from '../lib/dates';
 import { attendanceFor, countStatus, matchRecord, pastEvents, scorerStats } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
 import { saveFile, toCSV } from '../lib/native';
 import { buildReport, savePDF } from '../lib/pdf';
 import { Icon } from '../components/Icon';
+import { ResultBadge } from '../components/EventRow';
 import { Empty, Meter, PageHead, Segmented, useDialog } from '../components/ui';
 
 type SortKey = 'rate' | 'present' | 'absent' | 'name';
@@ -49,6 +50,16 @@ export function StatsView() {
     .filter((p) => p.ext && (p.ext.apps !== undefined || p.ext.goals !== undefined))
     .sort((a, b) => (b.ext!.goals ?? 0) - (a.ext!.goals ?? 0) || (b.ext!.minutes ?? 0) - (a.ext!.minutes ?? 0));
   const record = matchRecord(allInRange);
+  const comps = (
+    [
+      ['match', 'Punktspiele'],
+      ['cup', 'Pokal'],
+      ['testmatch', 'Testspiele'],
+    ] as [EventType, string][]
+  )
+    .map(([t, label]) => ({ t, label, r: matchRecord(allInRange, [t]) }))
+    .filter((c) => c.r.played > 0);
+  const games = allInRange.filter((e) => isMatch(e.type) && e.result).reverse();
   const avg = evs.length ? Math.round((evs.reduce((s, e) => s + countStatus(e, players).present, 0) / evs.length) * 10) / 10 : null;
   const teamRate = (() => {
     const t = rows.reduce((a, r) => ({ p: a.p + r.s.present, c: a.c + r.s.counted }), { p: 0, c: 0 });
@@ -79,7 +90,10 @@ export function StatsView() {
             ['Ausgewertete Termine', String(evs.length)],
             ['Spieler pro Termin (Durchschnitt)', avg === null ? '–' : String(avg).replace('.', ',')],
             ['Quote der Mannschaft', teamRate === null ? '–' : `${teamRate} %`],
-            ...(record.played ? ([['Bilanz (S–U–N)', `${record.win}–${record.draw}–${record.loss}, Tore ${record.goalsFor}:${record.goalsAgainst}`]] as [string, string][]) : []),
+            ...(record.played ? ([['Punktspiele (S–U–N)', `${record.win}–${record.draw}–${record.loss}, Tore ${record.goalsFor}:${record.goalsAgainst}, ${record.points} Punkte`]] as [string, string][]) : []),
+            ...comps
+              .filter((c) => c.t !== 'match')
+              .map((c) => [`${c.label} (S–U–N)`, `${c.r.win}–${c.r.draw}–${c.r.loss}, Tore ${c.r.goalsFor}:${c.r.goalsAgainst}`] as [string, string]),
           ],
         },
         {
@@ -243,7 +257,7 @@ export function StatsView() {
                     {record.win}–{record.draw}–{record.loss}
                   </span>
                   <span className="kpi-label">
-                    Siege, Remis, Niederlagen
+                    Punktspiele S–U–N
                     {record.form.length > 0 && (
                       <span className="form-pills" aria-label="Form der letzten Spiele" style={{ marginLeft: 8 }}>
                         {record.form.map((o, i) => (
@@ -259,9 +273,65 @@ export function StatsView() {
                   <span className="kpi-value">
                     {record.goalsFor}:{record.goalsAgainst}
                   </span>
-                  <span className="kpi-label">Tore · {record.points} Punkte</span>
+                  <span className="kpi-label">Tore Liga · {record.points} Punkte</span>
                 </div>
               </div>
+
+              {comps.length > 0 && (
+                <section className="section">
+                  <div className="section-head">
+                    <h2>Spiele nach Wettbewerb</h2>
+                  </div>
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Wettbewerb</th>
+                          <th className="r">Sp.</th>
+                          <th className="r">S–U–N</th>
+                          <th className="r">Tore</th>
+                          <th className="r hide-sm">Diff.</th>
+                          <th className="r">Pkt.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comps.map(({ t, label, r }) => (
+                          <tr key={t}>
+                            <td className="name">{label}</td>
+                            <td className="r">{r.played}</td>
+                            <td className="r num strong">
+                              {r.win}–{r.draw}–{r.loss}
+                            </td>
+                            <td className="r">
+                              {r.goalsFor}:{r.goalsAgainst}
+                            </td>
+                            <td className="r hide-sm">{r.goalsFor - r.goalsAgainst > 0 ? '+' : ''}{r.goalsFor - r.goalsAgainst}</td>
+                            <td className="r">{t === 'match' ? r.points : '–'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="list" style={{ marginTop: 10 }}>
+                    {games.slice(0, 12).map((e) => (
+                      <button key={e.id} className="list-row" onClick={() => go({ tab: 'events', eventId: e.id })}>
+                        <span className="grow">
+                          <span className="title ellipsis" style={{ display: 'block' }}>
+                            {eventTitle(e)}
+                          </span>
+                          <span className="sub">
+                            {TYPE_LABEL[e.type]} · {formatDate(e.date, true)}
+                          </span>
+                        </span>
+                        <ResultBadge result={e.result} />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="small muted" style={{ marginTop: 8 }}>
+                    Die Bilanz oben zählt nur Punktspiele. Stimmt ein Spiel nicht, öffne es und ändere unter „Bearbeiten“ die Art (Punktspiel, Pokalspiel, Testspiel).
+                  </p>
+                </section>
+              )}
 
               <section className="panel panel-pad section">
                 <div className="section-head" style={{ marginBottom: 4 }}>

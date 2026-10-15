@@ -113,7 +113,7 @@ export function Dashboard() {
           <div className="stat-value">
             {record.win}–{record.draw}–{record.loss}
           </div>
-          <div className="stat-label">Bilanz (S–U–N)</div>
+          <div className="stat-label">Punktspiele S–U–N</div>
         </button>
         <button className="stat" onClick={() => go({ tab: 'stats' })}>
           <div className="stat-value">{avgTraining ?? '–'}</div>

@@ -106,9 +106,10 @@ export const outcome = (r?: string): Outcome | null => {
   return p[0] > p[1] ? 'win' : p[0] < p[1] ? 'loss' : 'draw';
 };
 
-export function matchRecord(events: TeamEvent[]) {
+/** Bilanz – standardmäßig nur Punktspiele (Liga). Pokal- und Testspiele werden getrennt ausgewertet. */
+export function matchRecord(events: TeamEvent[], types: EventType[] = ['match']) {
   const rec = { played: 0, win: 0, draw: 0, loss: 0, goalsFor: 0, goalsAgainst: 0, points: 0, form: [] as Outcome[] };
-  const sorted = [...events].filter((e) => isMatch(e.type) && parseResult(e.result)).sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...events].filter((e) => types.includes(e.type) && parseResult(e.result)).sort((a, b) => a.date.localeCompare(b.date));
   for (const e of sorted) {
     const [f, a] = parseResult(e.result)!;
     const o = outcome(e.result)!;

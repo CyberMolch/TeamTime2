@@ -78,7 +78,7 @@ export function demoData(): TeamData {
     const ev: TeamEvent = {
       id: `e${n}`,
       title: `Spiel gegen ${opponents[idx]}`,
-      type: w === -6 ? 'testmatch' : 'match',
+      type: w === -6 ? 'testmatch' : w === -3 ? 'cup' : 'match',
       date: sat,
       time: '14:00',
       meetTime: '13:00',
