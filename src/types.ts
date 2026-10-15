@@ -2,7 +2,7 @@
 // "players", "events" und Dokument "settings/{uid}"), damit vorhandene Daten weiterleben.
 
 export type AttendanceStatus = 'present' | 'absent' | 'excused' | 'unsure' | 'injured' | 'none';
-export type EventType = 'training' | 'match' | 'testmatch' | 'treffen' | 'other';
+export type EventType = 'training' | 'match' | 'cup' | 'testmatch' | 'treffen' | 'other';
 
 export interface Player {
   id: string;
@@ -152,12 +152,13 @@ export const STATUS_LABEL: Record<AttendanceStatus, string> = {
 export const TYPE_LABEL: Record<EventType, string> = {
   training: 'Training',
   match: 'Punktspiel',
+  cup: 'Pokalspiel',
   testmatch: 'Testspiel',
   treffen: 'Treffen',
   other: 'Sonstiges',
 };
 
-export const isMatch = (t: EventType) => t === 'match' || t === 'testmatch';
+export const isMatch = (t: EventType) => t === 'match' || t === 'cup' || t === 'testmatch';
 
 export const DEFAULT_PENALTIES: PenaltyRule[] = [
   { id: 'p1', reason: 'Zuspätkommen Training', amount: 5 },

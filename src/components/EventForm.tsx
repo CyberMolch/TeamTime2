@@ -5,7 +5,7 @@ import { addDays, formatDateNumeric, parseDate, todayISO, toISODate } from '../l
 import { newId } from '../lib/native';
 import { Field, Sheet, useDialog } from './ui';
 
-const TYPES: EventType[] = ['training', 'match', 'testmatch', 'treffen', 'other'];
+const TYPES: EventType[] = ['training', 'match', 'cup', 'testmatch', 'treffen', 'other'];
 const WEEKDAYS = [
   { d: 1, l: 'Mo' },
   { d: 2, l: 'Di' },

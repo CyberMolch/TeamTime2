@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { EventType, TYPE_LABEL } from '../types';
+import { EventType, TYPE_LABEL, isMatch } from '../types';
 import { isOver, parseDate } from '../lib/dates';
 import { EventRow } from '../components/EventRow';
 import { EventForm } from '../components/EventForm';
@@ -20,7 +20,7 @@ export function EventsView() {
 
   const filtered = useMemo(() => {
     const matchType = (t: EventType) =>
-      type === 'all' || (type === 'training' ? t === 'training' : type === 'games' ? t === 'match' || t === 'testmatch' : t === 'treffen' || t === 'other');
+      type === 'all' || (type === 'training' ? t === 'training' : type === 'games' ? isMatch(t) : t === 'treffen' || t === 'other');
     const list = events.filter((e) => matchType(e.type) && (when === 'upcoming' ? !isOver(e.date, e.time) : isOver(e.date, e.time)));
     return when === 'past' ? list.reverse() : list;
   }, [events, when, type]);

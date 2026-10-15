@@ -24,7 +24,7 @@ export function StatsView() {
 
   const seasonStart = currentSeasonStart(club.seasonStart);
   const from = range === 'season' ? seasonStart : range === '8w' ? addDays(todayISO(), -56) : undefined;
-  const types: EventType[] | undefined = kind === 'training' ? ['training'] : kind === 'games' ? ['match', 'testmatch'] : undefined;
+  const types: EventType[] | undefined = kind === 'training' ? ['training'] : kind === 'games' ? ['match', 'cup', 'testmatch'] : undefined;
   const evs = useMemo(() => pastEvents(events, { from, types }), [events, from, kind]);
   const allInRange = useMemo(() => pastEvents(events, { from }), [events, from]);
   const rangeLabel = range === 'season' ? `Saison ${seasonLabel(seasonStart)}` : range === '8w' ? 'Letzte 8 Wochen' : 'Gesamter Zeitraum';

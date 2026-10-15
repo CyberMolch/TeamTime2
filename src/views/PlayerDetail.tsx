@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { STATUS_LABEL } from '../types';
+import { STATUS_LABEL, isMatch } from '../types';
 import { ageOn, currentSeasonStart, formatDate, formatDateNumeric, seasonLabel } from '../lib/dates';
 import { attendanceFor, euro, fineBalance, pastEvents, presentStreak, scorerStats } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
@@ -31,7 +31,7 @@ export function PlayerDetail({ id }: { id: string }) {
 
   const all = attendanceFor(p.id, evs);
   const trainings = attendanceFor(p.id, evs.filter((e) => e.type === 'training'));
-  const matches = attendanceFor(p.id, evs.filter((e) => e.type === 'match' || e.type === 'testmatch'));
+  const matches = attendanceFor(p.id, evs.filter((e) => isMatch(e.type)));
   const streak = presentStreak(p.id, [...evs].reverse());
   const sc = scorerStats(p, evs, range === 'all');
   const fines = fineBalance((club.fines || []).filter((f) => f.playerId === p.id));
