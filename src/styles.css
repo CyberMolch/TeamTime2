@@ -2428,3 +2428,29 @@ body {
     height: 32px;
   }
 }
+
+/* Passwort anzeigen */
+.pw-wrap {
+  position: relative;
+  display: block;
+}
+.pw-wrap input {
+  width: 100%;
+  padding-right: 48px !important;
+}
+.pw-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.pw-toggle:hover {
+  color: var(--ink);
+  background: var(--fill);
+}

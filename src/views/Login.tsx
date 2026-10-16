@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useStore } from '../data/store';
 import { isNative } from '../lib/native';
-import { Field } from '../components/ui';
+import { Field, PasswordInput } from '../components/ui';
 import { Welcome } from './Welcome';
 
 export function Login() {
@@ -99,8 +99,7 @@ export function Login() {
               <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </Field>
             <Field label="Passwort">
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 required
                 minLength={6}

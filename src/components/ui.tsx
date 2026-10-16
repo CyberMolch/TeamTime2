@@ -1,4 +1,4 @@
-import { createContext, ReactNode, type TouchEvent, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, type InputHTMLAttributes, ReactNode, type TouchEvent, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Icon, IconName } from './Icon';
 import { AttendanceStatus, Player, STATUS_LABEL } from '../types';
 import { initials } from '../lib/stats';
@@ -241,6 +241,30 @@ export function Meter({ value, tone }: { value: number | null; tone?: 'good' | '
   return (
     <span className="meter" aria-hidden="true">
       <span className={`meter-fill m-${value === null ? 'none' : t}`} style={{ width: `${v}%` }} />
+    </span>
+  );
+}
+
+/** Passwortfeld mit Auge-Knopf zum Ein- und Ausblenden */
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [show, setShow] = useState(false);
+  return (
+    <span className="pw-wrap">
+      <input {...props} type={show ? 'text' : 'password'} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+      <button
+        type="button"
+        className="pw-toggle"
+        onClick={(e) => {
+          e.preventDefault();
+          setShow((v) => !v);
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+        aria-label={show ? 'Passwort verbergen' : 'Passwort anzeigen'}
+        aria-pressed={show}
+        title={show ? 'Passwort verbergen' : 'Passwort anzeigen'}
+      >
+        <Icon name={show ? 'eyeOff' : 'eye'} size={20} />
+      </button>
     </span>
   );
 }

@@ -7,7 +7,7 @@ import { exportCalendar, loadReminderPrefs, ReminderPrefs, requestNotificationPe
 import { buildReport, savePDF } from '../lib/pdf';
 import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
-import { Field, PageHead, Segmented, useDialog } from '../components/ui';
+import { Field, PageHead, PasswordInput, Segmented, useDialog } from '../components/ui';
 
 export const APP_VERSION = '2.2';
 export const REPO_URL = 'https://github.com/CyberMolch/TeamTime2';
@@ -372,7 +372,9 @@ function AccountPanel() {
             <b>Für die Android-App:</b> Dort geht die Google-Anmeldung nicht. Leg hier ein Passwort fest und melde dich in der App mit deiner E-Mail und diesem Passwort an.
           </span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input className="input" type="password" autoComplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)" value={pw} onChange={(e) => setPw(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+            <span style={{ flex: 1, minWidth: 200 }}>
+              <PasswordInput className="input" autoComplete="new-password" placeholder="Neues Passwort (mind. 6 Zeichen)" value={pw} onChange={(e) => setPw(e.target.value)} />
+            </span>
             <button className="btn btn-primary" disabled={busy || pw.length < 6} onClick={setPassword}>
               <Icon name="key" /> Festlegen
             </button>
