@@ -432,7 +432,7 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
     const v = Math.max(0, (cur[key] || 0) + delta);
     const next = { ...cur, [key]: v };
     const scorers = { ...(e.scorers || {}) };
-    if (!next.goals && !next.assists && !next.yellow && !next.red) delete scorers[pid];
+    if (!next.goals && !next.assists && !next.yellow && !next.yellowRed && !next.red) delete scorers[pid];
     else scorers[pid] = next;
     saveEvent({ ...e, scorers });
   };
@@ -508,33 +508,49 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
         {involved.length === 0 ? (
           <p className="muted small">Sobald Spieler zugesagt haben oder aufgestellt sind, kannst du hier Tore und Karten eintragen.</p>
         ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Spieler</th>
-                  <th className="r">Tore</th>
-                  <th className="r">Vorl.</th>
-                  <th className="r">Gelb</th>
-                  <th className="r">Rot</th>
-                </tr>
-              </thead>
-              <tbody>
-                {involved.map((p) => {
-                  const m = e.scorers?.[p.id];
-                  return (
-                    <tr key={p.id}>
-                      <td className="name">{p.name}</td>
-                      {(['goals', 'assists', 'yellow', 'red'] as (keyof MatchStat)[]).map((k) => (
-                        <td className="r" key={k}>
-                          <Stepper value={m?.[k] || 0} onChange={(d) => setStat(p.id, k, d)} label={`${{ goals: 'Tore', assists: 'Vorlagen', yellow: 'Gelbe Karten', red: 'Rote Karten' }[k]} ${p.name}`} />
-                        </td>
+          <div className="list ms-list">
+            {involved.map((p) => {
+              const m = e.scorers?.[p.id];
+              const toggle = (k: 'yellow' | 'yellowRed' | 'red') => setStat(p.id, k, m?.[k] ? -(m[k] || 0) : 1);
+              return (
+                <div className="ms-row" key={p.id}>
+                  <span className="ms-name">{p.name}</span>
+                  <span className="ms-controls">
+                    <span className="ms-field">
+                      <small>Tore</small>
+                      <Stepper value={m?.goals || 0} onChange={(d) => setStat(p.id, 'goals', d)} label={`Tore ${p.name}`} />
+                    </span>
+                    <span className="ms-field">
+                      <small>Vorl.</small>
+                      <Stepper value={m?.assists || 0} onChange={(d) => setStat(p.id, 'assists', d)} label={`Vorlagen ${p.name}`} />
+                    </span>
+                    <span className="ms-cards" role="group" aria-label={`Karten ${p.name}`}>
+                      {(
+                        [
+                          ['yellow', 'card-y', 'Gelbe Karte'],
+                          ['yellowRed', 'card-yr', 'Gelb-Rote Karte'],
+                          ['red', 'card-r', 'Rote Karte'],
+                        ] as const
+                      ).map(([k, cls, label]) => (
+                        <button
+                          key={k}
+                          className={'card-btn' + (m?.[k] ? ' on' : '')}
+                          onClick={() => {
+                            haptic();
+                            toggle(k);
+                          }}
+                          aria-pressed={!!m?.[k]}
+                          aria-label={`${label} ${p.name}`}
+                          title={label}
+                        >
+                          <i className={`card-ico ${cls}`} />
+                        </button>
                       ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

@@ -75,6 +75,10 @@ jobs:
           npx cap add android
           npx capacitor-assets generate --android
           cp -r android-res/* android/app/src/main/res/
+          # Tastatur schiebt die Ansicht hoch statt Eingabefelder zu verdecken
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q windowSoftInputMode $M || sed -i 's/android:launchMode="singleTask"/android:launchMode="singleTask" android:windowSoftInputMode="adjustResize"/' $M
+          grep -n "windowSoftInputMode" $M || echo "::warning::windowSoftInputMode nicht gesetzt"
           npx cap sync android
 
       - name: Versionsnummer setzen

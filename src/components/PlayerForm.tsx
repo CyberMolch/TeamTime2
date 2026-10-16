@@ -10,7 +10,7 @@ export function PlayerForm({ player, onClose, onSaved }: { player?: Player; onCl
   const { savePlayer, allPlayers } = useStore();
   const { toast } = useDialog();
   const [p, setP] = useState<Player>(() => player || { id: newId(), name: '' });
-  const [showMore, setShowMore] = useState(!!(player?.goals || player?.assists || player?.yellowCards || player?.redCards));
+  const [showMore, setShowMore] = useState(!!(player?.goals || player?.assists || player?.yellowCards || player?.yellowRedCards || player?.redCards));
   const [err, setErr] = useState<string | null>(null);
   const set = (patch: Partial<Player>) => setP((x) => ({ ...x, ...patch }));
 
@@ -114,6 +114,9 @@ export function PlayerForm({ player, onClose, onSaved }: { player?: Player; onCl
             </Field>
             <Field label="Gelbe Karten">
               <input inputMode="numeric" value={p.yellowCards ?? ''} onChange={(e) => set({ yellowCards: num(e.target.value) })} />
+            </Field>
+            <Field label="Gelb-Rote Karten">
+              <input inputMode="numeric" value={p.yellowRedCards ?? ''} onChange={(e) => set({ yellowRedCards: num(e.target.value) })} />
             </Field>
             <Field label="Rote Karten">
               <input inputMode="numeric" value={p.redCards ?? ''} onChange={(e) => set({ redCards: num(e.target.value) })} />

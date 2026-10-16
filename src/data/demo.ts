@@ -102,6 +102,8 @@ export function demoData(): TeamData {
         if (a && a !== s) (ev.scorers[a.id] ||= { goals: 0, assists: 0 }).assists++;
       }
       if (n % 3 === 0 && present[2]) (ev.scorers[present[2].id] ||= { goals: 0, assists: 0 }).yellow = 1;
+      if (n % 7 === 0 && present[4]) (ev.scorers[present[4].id] ||= { goals: 0, assists: 0 }).yellowRed = 1;
+      if (n === 12 && present[5]) (ev.scorers[present[5].id] ||= { goals: 0, assists: 0 }).red = 1;
       ev.jerseyDuty = { playerId: players[(w + 8) % players.length].id, takenAt: `${sat}T16:30:00.000Z`, returnedAt: w < -1 ? `${addDays(sat, 3)}T18:00:00.000Z` : undefined };
     } else if (w === 0 || sat >= today) {
       ev.attendance = w === 0 ? Object.fromEntries(players.slice(0, 12).map((p, i) => [p.id, i === 3 ? 'absent' : i === 5 ? 'unsure' : 'present'])) : {};

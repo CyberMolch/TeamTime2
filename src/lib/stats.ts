@@ -64,6 +64,7 @@ export interface ScorerStats {
   goals: number;
   assists: number;
   yellow: number;
+  yellowRed: number;
   red: number;
   matches: number;
   starts: number;
@@ -74,6 +75,7 @@ export function scorerStats(player: Player, events: TeamEvent[], includeManual =
     goals: includeManual ? player.goals || 0 : 0,
     assists: includeManual ? player.assists || 0 : 0,
     yellow: includeManual ? player.yellowCards || 0 : 0,
+    yellowRed: includeManual ? player.yellowRedCards || 0 : 0,
     red: includeManual ? player.redCards || 0 : 0,
     matches: 0,
     starts: 0,
@@ -85,6 +87,7 @@ export function scorerStats(player: Player, events: TeamEvent[], includeManual =
       s.goals += m.goals || 0;
       s.assists += m.assists || 0;
       s.yellow += m.yellow || 0;
+      s.yellowRed += m.yellowRed || 0;
       s.red += m.red || 0;
     }
     if (e.attendance?.[player.id] === 'present' || e.lineup?.includes(player.id) || e.bench?.includes(player.id)) s.matches++;
@@ -159,6 +162,7 @@ export interface LeagueScorer {
   minutes?: number;
   assists: number;
   yellow: number;
+  yellowRed: number;
   red: number;
   official: boolean;
 }
@@ -176,6 +180,7 @@ export function leagueScorers(players: Player[], events: TeamEvent[], officialSe
       minutes: ext?.minutes,
       assists: app.assists,
       yellow: app.yellow,
+      yellowRed: app.yellowRed,
       red: app.red,
       official: !!ext,
     };

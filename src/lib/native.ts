@@ -142,3 +142,29 @@ export async function hideSplash() {
     /* egal */
   }
 }
+
+/** Tastatur: Eingabefeld immer sichtbar halten.
+ *  In der Android-App meldet das Keyboard-Plugin die Höhe; im Browser hilft scrollIntoView. */
+export function setupKeyboardAvoidance() {
+  const root = document.documentElement;
+  const reveal = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  document.addEventListener('focusin', () => setTimeout(reveal, 300));
+  window.visualViewport?.addEventListener('resize', () => setTimeout(reveal, 50));
+  if (!isNative()) return;
+  import('@capacitor/keyboard')
+    .then(({ Keyboard }) => {
+      Keyboard.addListener('keyboardWillShow', (info) => {
+        root.style.setProperty('--kb', `${info.keyboardHeight}px`);
+        root.classList.add('kb-open');
+      });
+      Keyboard.addListener('keyboardDidShow', () => setTimeout(reveal, 30));
+      Keyboard.addListener('keyboardWillHide', () => {
+        root.style.setProperty('--kb', '0px');
+        root.classList.remove('kb-open');
+      });
+    })
+    .catch(() => {});
+}

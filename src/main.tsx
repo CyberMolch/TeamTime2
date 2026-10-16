@@ -5,6 +5,9 @@ import './styles.css';
 import { App } from './App';
 import { StoreProvider } from './data/store';
 import { DialogProvider } from './components/ui';
+import { setupKeyboardAvoidance } from './lib/native';
+
+setupKeyboardAvoidance();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

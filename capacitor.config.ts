@@ -16,6 +16,10 @@ const config: CapacitorConfig = {
       backgroundColor: '#ffffff',
       showSpinner: false,
     },
+    Keyboard: {
+      // Android: Ansicht verkleinern, wenn die Tastatur aufgeht (auch im Vollbild/Edge-to-Edge)
+      resizeOnFullScreen: true,
+    },
     LocalNotifications: {
       smallIcon: 'ic_stat_teamtime',
       iconColor: '#0a6b3a',

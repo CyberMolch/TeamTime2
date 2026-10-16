@@ -147,9 +147,22 @@ export function PlayerDetail({ id }: { id: string }) {
         </div>
         <div className="stat">
           <div className="stat-value">
-            <span style={{ color: 'var(--st-unsure)' }}>{sc.yellow}</span> <span className="muted">·</span> <span style={{ color: 'var(--rose)' }}>{sc.red}</span>
+            <span className="cards-inline">
+              <span>
+                <i className="card-ico card-y" />
+                {sc.yellow}
+              </span>
+              <span>
+                <i className="card-ico card-yr" />
+                {sc.yellowRed}
+              </span>
+              <span>
+                <i className="card-ico card-r" />
+                {sc.red}
+              </span>
+            </span>
           </div>
-          <div className="stat-label">Gelb · Rot</div>
+          <div className="stat-label">Gelb · Gelb-Rot · Rot</div>
         </div>
       </div>
 

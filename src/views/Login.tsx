@@ -88,10 +88,9 @@ export function Login() {
               <div className="divider">oder mit E-Mail</div>
             </>
           )}
-          {native && (
-            <p className="small muted">
-              Du hast dich bisher mit Google angemeldet? Öffne TeamTime einmal am PC, geh zu <b>Einstellungen → Konto</b> und lege ein Passwort fest. Danach meldest du dich
-              hier mit deiner Google-E-Mail und diesem Passwort an.
+          {native && mode === 'login' && (
+            <p className="small muted login-hint">
+              Bisher mit Google angemeldet? Am PC unter <b>Einstellungen → Konto</b> ein Passwort festlegen und hier mit derselben E-Mail anmelden.
             </p>
           )}
 

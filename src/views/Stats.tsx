@@ -3,7 +3,7 @@ import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { EventType, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { addDays, currentSeasonStart, formatDate, formatDateNumeric, parseDate, seasonLabel, todayISO, weekdayShort } from '../lib/dates';
-import { attendanceFor, countStatus, leagueScorers, matchRecord, pastEvents } from '../lib/stats';
+import { attendanceFor, countStatus, leagueScorers, matchRecord, pastEvents, scorerStats } from '../lib/stats';
 import { FUSSBALLDE_SNAPSHOT } from '../data/fussballde';
 import { sameName } from '../components/RosterImport';
 import { newId } from '../lib/native';
@@ -49,11 +49,19 @@ export function StatsView() {
   const scorers = useMemo(
     () =>
       leagueScorers(players, allInRange, officialSeason)
-        .filter((x) => x.goals || x.assists || x.yellow || x.red)
+        .filter((x) => x.goals || x.assists)
         .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.apps - b.apps || a.p.name.localeCompare(b.p.name, 'de')),
     [players, allInRange, officialSeason],
   );
   const hasOfficial = scorers.some((x) => x.official);
+  const [cardScope, setCardScope] = useState<'league' | 'cup' | 'all'>('league');
+  const cards = useMemo(() => {
+    const types: EventType[] = cardScope === 'league' ? ['match'] : cardScope === 'cup' ? ['cup'] : ['match', 'cup', 'testmatch'];
+    return players
+      .map((p) => ({ p, s: scorerStats(p, allInRange, false, types) }))
+      .filter((x) => x.s.yellow || x.s.yellowRed || x.s.red)
+      .sort((a, b) => b.s.red - a.s.red || b.s.yellowRed - a.s.yellowRed || b.s.yellow - a.s.yellow || a.p.name.localeCompare(b.p.name, 'de'));
+  }, [players, allInRange, cardScope]);
   const snapshotFits = FUSSBALLDE_SNAPSHOT.season === seasonLong;
   const snapshotNewer = snapshotFits && !players.some((p) => p.ext?.season === seasonLong && p.ext.updatedAt >= FUSSBALLDE_SNAPSHOT.updatedAt);
   const [importing, setImporting] = useState(false);
@@ -96,11 +104,11 @@ export function StatsView() {
   })();
 
   const exportCSV = async () => {
-    const head = ['Spieler', 'Quote %', 'Dabei', 'Entschuldigt', 'Unentschuldigt', 'Unsicher', 'Verletzt', 'Tore (Liga)', 'Spiele (Liga)', 'Vorlagen', 'Gelb', 'Rot'];
+    const head = ['Spieler', 'Quote %', 'Dabei', 'Entschuldigt', 'Unentschuldigt', 'Unsicher', 'Verletzt', 'Tore (Liga)', 'Spiele (Liga)', 'Vorlagen', 'Gelb (Liga)', 'Gelb-Rot (Liga)', 'Rot (Liga)'];
     const league = new Map(leagueScorers(players, allInRange, officialSeason).map((x) => [x.p.id, x]));
     const data = rows.map(({ p, s }) => {
       const sc = league.get(p.id)!;
-      return [p.name, s.rate ?? '', s.present, s.excused, s.absent, s.unsure, s.injured, sc.goals, sc.apps, sc.assists, sc.yellow, sc.red];
+      return [p.name, s.rate ?? '', s.present, s.excused, s.absent, s.unsure, s.injured, sc.goals, sc.apps, sc.assists, sc.yellow, sc.yellowRed, sc.red];
     });
     await saveFile(`teamtime-auswertung-${todayISO()}.csv`, toCSV([head, ...data]), 'text/csv');
     toast('Tabelle exportiert.');
@@ -158,6 +166,25 @@ export function StatsView() {
               },
             ]
           : []),
+        ...(() => {
+          const lc = players
+            .map((p) => ({ p, s: scorerStats(p, allInRange, false, ['match']) }))
+            .filter((x) => x.s.yellow || x.s.yellowRed || x.s.red);
+          return lc.length
+            ? [
+                {
+                  heading: 'Karten Punktspiele',
+                  columns: [
+                    { title: 'Spieler', width: 4 },
+                    { title: 'Gelb', width: 1, align: 'right' as const },
+                    { title: 'Gelb-Rot', width: 1.2, align: 'right' as const },
+                    { title: 'Rot', width: 1, align: 'right' as const },
+                  ],
+                  rows: lc.map((x) => [x.p.name, x.s.yellow || '', x.s.yellowRed || '', x.s.red || '']),
+                },
+              ]
+            : [];
+        })(),
       ],
     });
     await savePDF(`anwesenheit-${todayISO()}.pdf`, bytes);
@@ -376,8 +403,6 @@ export function StatsView() {
                           <th className="r">Spiele</th>
                           <th className="r hide-sm">Minuten</th>
                           <th className="r hide-sm">Vorlagen</th>
-                          <th className="r hide-sm">Gelb</th>
-                          <th className="r hide-sm">Rot</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -389,8 +414,6 @@ export function StatsView() {
                             <td className="r">{x.apps}</td>
                             <td className="r hide-sm">{x.minutes ?? '–'}</td>
                             <td className="r hide-sm">{x.assists || ''}</td>
-                            <td className="r hide-sm">{x.yellow || ''}</td>
-                            <td className="r hide-sm">{x.red || ''}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -399,7 +422,7 @@ export function StatsView() {
                           <td />
                           <td className="name">Gesamt</td>
                           <td className="r num strong">{scorers.reduce((n, x) => n + x.goals, 0)}</td>
-                          <td colSpan={5} />
+                          <td colSpan={3} />
                         </tr>
                       </tfoot>
                     </table>
@@ -407,8 +430,64 @@ export function StatsView() {
                 )}
                 <p className="small muted" style={{ marginTop: 8 }}>
                   Nur Punktspiele – Pokal- und Testspiele zählen hier nicht mit.
-                  {hasOfficial ? ' Vorlagen und Karten stammen aus den in der App erfassten Spielen.' : ''}
+                  {hasOfficial ? ' Vorlagen stammen aus den in der App erfassten Spielen.' : ''}
                 </p>
+              </section>
+
+              <section className="section">
+                <div className="section-head">
+                  <h2>Karten</h2>
+                  <Segmented
+                    label="Wettbewerb"
+                    value={cardScope}
+                    onChange={setCardScope}
+                    options={[
+                      { value: 'league', label: 'Liga' },
+                      { value: 'cup', label: 'Pokal' },
+                      { value: 'all', label: 'Alle Spiele' },
+                    ]}
+                  />
+                </div>
+                {cards.length === 0 ? (
+                  <p className="muted small">Keine Karten {cardScope === 'league' ? 'in Punktspielen' : cardScope === 'cup' ? 'im Pokal' : ''} eingetragen. Das geht im Spiel unter „Spiel & Aufstellung“.</p>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Spieler</th>
+                          <th className="r">
+                            <span className="card-ico card-y" title="Gelb" /> Gelb
+                          </th>
+                          <th className="r">
+                            <span className="card-ico card-yr" title="Gelb-Rot" /> Gelb-Rot
+                          </th>
+                          <th className="r">
+                            <span className="card-ico card-r" title="Rot" /> Rot
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cards.map(({ p, s }) => (
+                          <tr key={p.id} onClick={() => go({ tab: 'team', playerId: p.id })} style={{ cursor: 'pointer' }}>
+                            <td className="name">{p.name}</td>
+                            <td className="r num strong">{s.yellow || '–'}</td>
+                            <td className="r num strong">{s.yellowRed || '–'}</td>
+                            <td className="r num strong">{s.red || '–'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td className="name">Gesamt</td>
+                          <td className="r num strong">{cards.reduce((n, c) => n + c.s.yellow, 0)}</td>
+                          <td className="r num strong">{cards.reduce((n, c) => n + c.s.yellowRed, 0)}</td>
+                          <td className="r num strong">{cards.reduce((n, c) => n + c.s.red, 0)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </section>
             </>
           )}

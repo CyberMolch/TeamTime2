@@ -18,6 +18,7 @@ export interface Player {
   goals?: number;
   assists?: number;
   yellowCards?: number;
+  yellowRedCards?: number;
   redCards?: number;
   injuryHistory?: string;
   medicalNotes?: string;
@@ -46,6 +47,7 @@ export interface MatchStat {
   goals: number;
   assists: number;
   yellow?: number;
+  yellowRed?: number; // Gelb-Rot
   red?: number;
 }
 
