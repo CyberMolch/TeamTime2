@@ -119,7 +119,7 @@ export function CardsView() {
   );
 }
 
-function CardInput({ value, min, label, onCommit }: { value: number; min: number; label: string; onCommit: (v: number) => void }) {
+export function CardInput({ value, min, label, onCommit }: { value: number; min: number; label: string; onCommit: (v: number) => void }) {
   const [text, setText] = useState(value ? String(value) : '');
   useEffect(() => setText(value ? String(value) : ''), [value]);
   const commit = () => {

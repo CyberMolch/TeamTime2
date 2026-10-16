@@ -7,11 +7,10 @@ import { addCards, attendanceFor, cardTotals, countStatus, leagueScorers, matchR
 import { nextSeasonStart } from '../lib/dates';
 import type { CardCount } from '../types';
 import { FUSSBALLDE_SNAPSHOT } from '../data/fussballde';
-import { sameName } from '../components/RosterImport';
-import { newId } from '../lib/native';
 import { eventTitle } from '../lib/texts';
 import { saveFile, toCSV } from '../lib/native';
 import { buildReport, savePDF } from '../lib/pdf';
+import { importFussballdeScorers } from '../lib/scorers';
 import { Icon } from '../components/Icon';
 import { ResultBadge } from '../components/EventRow';
 import { Empty, Meter, PageHead, Segmented, useDialog } from '../components/ui';
@@ -76,21 +75,7 @@ export function StatsView() {
   const [importing, setImporting] = useState(false);
   const importSnapshot = async () => {
     setImporting(true);
-    const ext = (r: [string, number, number, number]) => ({ season: FUSSBALLDE_SNAPSHOT.season, source: FUSSBALLDE_SNAPSHOT.source, apps: r[1], minutes: r[2], goals: r[3], updatedAt: FUSSBALLDE_SNAPSHOT.updatedAt });
-    const used = new Set<string>();
-    let updated = 0;
-    let added = 0;
-    for (const r of FUSSBALLDE_SNAPSHOT.rows) {
-      const match = allPlayers.find((p) => !used.has(p.id) && sameName(p.name, r[0]));
-      if (match) {
-        used.add(match.id);
-        await savePlayer({ ...match, ext: ext(r) });
-        updated++;
-      } else if (r[3] > 0) {
-        await savePlayer({ id: newId(), name: r[0], ext: ext(r) });
-        added++;
-      }
-    }
+    const { updated, added } = await importFussballdeScorers(allPlayers, savePlayer);
     setImporting(false);
     toast(`Torschützen übernommen: ${updated} Spieler aktualisiert${added ? `, ${added} neu im Kader` : ''}.`);
   };
@@ -384,9 +369,9 @@ export function StatsView() {
               <section className="section">
                 <div className="section-head">
                   <h2>Torschützen Punktspiele</h2>
-                  <span className="small muted">
-                    {hasOfficial ? `Tore & Einsätze laut ${FUSSBALLDE_SNAPSHOT.source}` : 'in der App erfasste Punktspiele'}
-                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => go({ tab: 'scorers' })}>
+                    Alle anzeigen <Icon name="chevronRight" size={16} />
+                  </button>
                 </div>
                 {range === 'season' && snapshotNewer && (
                   <div className="banner banner-info" style={{ alignItems: 'center', flexWrap: 'wrap' }}>

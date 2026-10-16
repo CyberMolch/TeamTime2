@@ -2473,3 +2473,22 @@ body {
 }
 .link-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .section-head .btn-sm { margin-left: auto; }
+
+/* Torschützen-Seite */
+.scorer-list { list-style: none; margin: 16px 0 0; padding: 0; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.scorer-list li + li { border-top: 1px solid var(--line); }
+.scorer-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.scorer-row:hover { background: var(--surface-2); }
+.scorer-rank { width: 2.2ch; flex: none; text-align: right; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scorer-row.top .scorer-rank { color: var(--green-ink); }
+.scorer-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.scorer-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scorer-bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+.scorer-bar i { display: block; height: 100%; border-radius: 3px; background: var(--faint); }
+.scorer-row.top .scorer-bar i { background: var(--green); }
+.scorer-meta { font-size: 0.78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scorer-meta:empty { display: none; }
+.scorer-goals { flex: none; min-width: 3ch; display: flex; flex-direction: column; align-items: flex-end; font-size: 1.35rem; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.scorer-goals small { font-size: 0.7rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.stat-value.ellipsis { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 699px) { .scorer-kpis > :last-child { grid-column: 1 / -1; } }
