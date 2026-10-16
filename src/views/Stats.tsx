@@ -3,7 +3,9 @@ import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { EventType, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { addDays, currentSeasonStart, formatDate, formatDateNumeric, parseDate, seasonLabel, todayISO, weekdayShort } from '../lib/dates';
-import { attendanceFor, countStatus, leagueScorers, matchRecord, pastEvents, scorerStats } from '../lib/stats';
+import { addCards, attendanceFor, cardTotals, countStatus, leagueScorers, matchRecord, pastEvents } from '../lib/stats';
+import { nextSeasonStart } from '../lib/dates';
+import type { CardCount } from '../types';
 import { FUSSBALLDE_SNAPSHOT } from '../data/fussballde';
 import { sameName } from '../components/RosterImport';
 import { newId } from '../lib/native';
@@ -55,10 +57,17 @@ export function StatsView() {
   );
   const hasOfficial = scorers.some((x) => x.official);
   const [cardScope, setCardScope] = useState<'league' | 'cup' | 'all'>('league');
+  // Karten immer für die laufende Saison: eingetragene Zahlen + in Spielen erfasste Karten
+  const seasonCards = (p: Player, scope: 'league' | 'cup' | 'all'): CardCount => {
+    const to = nextSeasonStart(seasonStart);
+    const league = cardTotals(p, events, seasonLong, 'match', seasonStart, to);
+    if (scope === 'league') return league;
+    const cup = cardTotals(p, events, seasonLong, 'cup', seasonStart, to);
+    return scope === 'cup' ? cup : addCards(league, cup);
+  };
   const cards = useMemo(() => {
-    const types: EventType[] = cardScope === 'league' ? ['match'] : cardScope === 'cup' ? ['cup'] : ['match', 'cup', 'testmatch'];
     return players
-      .map((p) => ({ p, s: scorerStats(p, allInRange, false, types) }))
+      .map((p) => ({ p, s: seasonCards(p, cardScope) }))
       .filter((x) => x.s.yellow || x.s.yellowRed || x.s.red)
       .sort((a, b) => b.s.red - a.s.red || b.s.yellowRed - a.s.yellowRed || b.s.yellow - a.s.yellow || a.p.name.localeCompare(b.p.name, 'de'));
   }, [players, allInRange, cardScope]);
@@ -168,7 +177,7 @@ export function StatsView() {
           : []),
         ...(() => {
           const lc = players
-            .map((p) => ({ p, s: scorerStats(p, allInRange, false, ['match']) }))
+            .map((p) => ({ p, s: seasonCards(p, 'league') }))
             .filter((x) => x.s.yellow || x.s.yellowRed || x.s.red);
           return lc.length
             ? [
@@ -436,7 +445,10 @@ export function StatsView() {
 
               <section className="section">
                 <div className="section-head">
-                  <h2>Karten</h2>
+                  <h2>Karten · Saison {seasonLabel(seasonStart)}</h2>
+                  <button className="btn btn-ghost btn-sm" onClick={() => go({ tab: 'cards' })}>
+                    <Icon name="edit" size={16} /> Eintragen
+                  </button>
                   <Segmented
                     label="Wettbewerb"
                     value={cardScope}
@@ -449,7 +461,7 @@ export function StatsView() {
                   />
                 </div>
                 {cards.length === 0 ? (
-                  <p className="muted small">Keine Karten {cardScope === 'league' ? 'in Punktspielen' : cardScope === 'cup' ? 'im Pokal' : ''} eingetragen. Das geht im Spiel unter „Spiel & Aufstellung“.</p>
+                  <p className="muted small">Keine Karten {cardScope === 'league' ? 'in Punktspielen' : cardScope === 'cup' ? 'im Pokal' : ''} eingetragen. Tippe auf „Eintragen“, um die Anzahl pro Spieler einzugeben.</p>
                 ) : (
                   <div className="table-wrap">
                     <table className="data">

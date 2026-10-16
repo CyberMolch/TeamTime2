@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { STATUS_LABEL, isMatch } from '../types';
-import { ageOn, currentSeasonStart, formatDate, formatDateNumeric, seasonLabel } from '../lib/dates';
-import { attendanceFor, euro, fineBalance, pastEvents, presentStreak, scorerStats } from '../lib/stats';
+import { CardCount, STATUS_LABEL, isMatch } from '../types';
+import { ageOn, currentSeasonStart, formatDate, formatDateNumeric, nextSeasonStart, seasonKey, seasonLabel } from '../lib/dates';
+import { addCards, attendanceFor, cardTotals, euro, fineBalance, pastEvents, presentStreak, scorerStats } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, Segmented, StatusDot, useDialog } from '../components/ui';
@@ -34,6 +34,15 @@ export function PlayerDetail({ id }: { id: string }) {
   const matches = attendanceFor(p.id, evs.filter((e) => isMatch(e.type)));
   const streak = presentStreak(p.id, [...evs].reverse());
   const sc = scorerStats(p, evs, range === 'all');
+  // Karten: Saison = eingetragene Zahlen (Liga + Pokal) + in Spielen erfasste; Gesamt = alles zusammen
+  const crd: CardCount = (() => {
+    if (range === 'season') {
+      const key = seasonKey(seasonStart);
+      const to = nextSeasonStart(seasonStart);
+      return addCards(cardTotals(p, events, key, 'match', seasonStart, to), cardTotals(p, events, key, 'cup', seasonStart, to));
+    }
+    return Object.values(p.cards || {}).reduce(addCards, { yellow: sc.yellow, yellowRed: sc.yellowRed, red: sc.red });
+  })();
   const fines = fineBalance((club.fines || []).filter((f) => f.playerId === p.id));
   const history = [...evs].reverse().filter((e) => e.attendance[p.id] && e.attendance[p.id] !== 'none').slice(0, 12);
   const jerseys = events.filter((e) => e.jerseyDuty?.playerId === p.id).length;
@@ -150,19 +159,21 @@ export function PlayerDetail({ id }: { id: string }) {
             <span className="cards-inline">
               <span>
                 <i className="card-ico card-y" />
-                {sc.yellow}
+                {crd.yellow}
               </span>
               <span>
                 <i className="card-ico card-yr" />
-                {sc.yellowRed}
+                {crd.yellowRed}
               </span>
               <span>
                 <i className="card-ico card-r" />
-                {sc.red}
+                {crd.red}
               </span>
             </span>
           </div>
-          <div className="stat-label">Gelb · Gelb-Rot · Rot</div>
+          <div className="stat-label">
+            <button className="link-btn" onClick={() => go({ tab: 'cards' })}>Gelb · Gelb-Rot · Rot</button>
+          </div>
         </div>
       </div>
 

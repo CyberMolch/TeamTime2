@@ -98,3 +98,14 @@ export function nextBirthday(birthISO: string): { date: string; inDays: number; 
 export function nowISOString() {
   return new Date().toISOString();
 }
+
+/** "2026/27" für eine Saison, die 2026 beginnt (bzw. "2026" bei Saisonstart im Januar) */
+export function seasonKey(startISO: string): string {
+  const l = seasonLabel(startISO);
+  return l.includes('/') ? `20${l.slice(0, 2)}/${l.slice(3)}` : l;
+}
+export function nextSeasonStart(startISO: string): string {
+  const d = parseDate(startISO);
+  d.setFullYear(d.getFullYear() + 1);
+  return toISODate(d);
+}

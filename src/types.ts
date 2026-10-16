@@ -25,6 +25,8 @@ export interface Player {
   notes?: string;
   tags?: string[];
   inactive?: boolean;
+  /** Direkt eingetragene Karten je Saison und Wettbewerb, Schlüssel z. B. "2026/27|match" */
+  cards?: Record<string, CardCount>;
   /** Offizielle Saisonwerte, z. B. von fussball.de eingespielt */
   ext?: ExternalStats;
   // Altfelder der ersten Version (werden nicht mehr gepflegt, nur toleriert)
@@ -41,6 +43,12 @@ export interface ExternalStats {
   minutes?: number;
   goals?: number;
   updatedAt: string; // YYYY-MM-DD
+}
+
+export interface CardCount {
+  yellow: number;
+  yellowRed: number;
+  red: number;
 }
 
 export interface MatchStat {

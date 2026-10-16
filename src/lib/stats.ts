@@ -1,4 +1,4 @@
-import { AttendanceStatus, EventType, Fine, Player, TeamEvent, isMatch } from '../types';
+import { AttendanceStatus, CardCount, EventType, Fine, Player, TeamEvent, isMatch } from '../types';
 import { isOver } from './dates';
 
 export interface AttendanceStats {
@@ -186,3 +186,29 @@ export function leagueScorers(players: Player[], events: TeamEvent[], officialSe
     };
   });
 }
+
+export type CardScope = 'match' | 'cup';
+
+/** Karten aus den in der App erfassten Spielen einer Saison und eines Wettbewerbs */
+export function matchCards(playerId: string, events: TeamEvent[], scope: CardScope, from: string, to?: string): CardCount {
+  const c: CardCount = { yellow: 0, yellowRed: 0, red: 0 };
+  for (const e of events) {
+    if (e.type !== scope || e.date < from || (to && e.date >= to)) continue;
+    const m = e.scorers?.[playerId];
+    if (!m) continue;
+    c.yellow += m.yellow || 0;
+    c.yellowRed += m.yellowRed || 0;
+    c.red += m.red || 0;
+  }
+  return c;
+}
+
+/** Gesamtzahl = direkt eingetragen + in Spielen erfasst */
+export function cardTotals(p: Player, events: TeamEvent[], season: string, scope: CardScope, from: string, to?: string): CardCount {
+  const base = p.cards?.[`${season}|${scope}`];
+  const m = matchCards(p.id, events, scope, from, to);
+  return { yellow: (base?.yellow || 0) + m.yellow, yellowRed: (base?.yellowRed || 0) + m.yellowRed, red: (base?.red || 0) + m.red };
+}
+
+export const addCards = (a: CardCount, b: CardCount): CardCount => ({ yellow: a.yellow + b.yellow, yellowRed: a.yellowRed + b.yellowRed, red: a.red + b.red });
+export const hasCards = (c: CardCount) => !!(c.yellow || c.yellowRed || c.red);
