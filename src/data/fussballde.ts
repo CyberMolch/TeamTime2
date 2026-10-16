@@ -1,0 +1,36 @@
+// Stand der Punktspiele laut fussball.de (Herren, Kreisliga Staffel B, Saison 2026/27).
+// fussball.de zählt in der Mannschaftsstatistik nur Meisterschaftsspiele – Summe der Tore
+// (28) entspricht dem Torverhältnis 28:3 in der Tabelle.
+export const FUSSBALLDE_SNAPSHOT = {
+  season: '2026/27',
+  updatedAt: '2026-10-16',
+  source: 'fussball.de',
+  rows: [
+    ['Tim Griesa', 5, 450, 6],
+    ['Salko Kukuljcic', 5, 450, 0],
+    ['Max Langer', 5, 450, 1],
+    ['Maximilian Schuschke', 5, 450, 1],
+    ['Marcus Kalich', 5, 429, 0],
+    ['Richard Greb', 5, 308, 4],
+    ['Florian Kuchenbecker', 4, 345, 7],
+    ['Christian Donath', 4, 339, 2],
+    ['Anton Kneist', 4, 332, 0],
+    ['Sylwester Szczykutowicz', 4, 289, 1],
+    ['Dennis Neu', 4, 202, 2],
+    ['Jannik Krüger', 3, 270, 0],
+    ['John Dähnert', 3, 185, 0],
+    ['Leon Patzak', 3, 120, 0],
+    ['Julian Pirwitz', 2, 150, 0],
+    ['Louis Nohl', 2, 149, 1],
+    ['Matthias Lossin', 2, 136, 1],
+    ['Maximilian Jähnichen', 2, 100, 2],
+    ['Till Lossin', 2, 53, 0],
+    ['Jan Prüfert', 2, 51, 0],
+    ['Jonas Geyer', 1, 90, 0],
+    ['Chris Andreas Koch', 1, 90, 0],
+    ['Daniel Federlin', 1, 45, 0],
+    ['Kemal Kukuljcic', 1, 22, 0],
+    ['Marco Lehmann', 0, 0, 0],
+    ['Justin Schindler', 0, 0, 0],
+  ] as [string, number, number, number][],
+};

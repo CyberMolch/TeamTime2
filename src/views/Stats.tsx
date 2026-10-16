@@ -3,7 +3,10 @@ import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { EventType, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { addDays, currentSeasonStart, formatDate, formatDateNumeric, parseDate, seasonLabel, todayISO, weekdayShort } from '../lib/dates';
-import { attendanceFor, countStatus, matchRecord, pastEvents, scorerStats } from '../lib/stats';
+import { attendanceFor, countStatus, leagueScorers, matchRecord, pastEvents } from '../lib/stats';
+import { FUSSBALLDE_SNAPSHOT } from '../data/fussballde';
+import { sameName } from '../components/RosterImport';
+import { newId } from '../lib/native';
 import { eventTitle } from '../lib/texts';
 import { saveFile, toCSV } from '../lib/native';
 import { buildReport, savePDF } from '../lib/pdf';
@@ -15,7 +18,7 @@ type SortKey = 'rate' | 'present' | 'absent' | 'name';
 type View = 'overview' | 'table' | 'grid';
 
 export function StatsView() {
-  const { players, events, club } = useStore();
+  const { players, allPlayers, events, club, savePlayer } = useStore();
   const { go } = useNav();
   const { toast } = useDialog();
   const [range, setRange] = useState<'season' | '8w' | 'all'>('season');
@@ -37,18 +40,44 @@ export function StatsView() {
     return r.sort((a, b) => (sort === 'name' ? a.p.name.localeCompare(b.p.name, 'de') : val(b) - val(a) || b.s.present - a.s.present));
   }, [players, evs, sort]);
 
+  // Torschützen nur aus Punktspielen; in der laufenden Saison mit den Zahlen von fussball.de
+  const seasonLong = (() => {
+    const l = seasonLabel(seasonStart);
+    return l.includes('/') ? `20${l.slice(0, 2)}/${l.slice(3)}` : l;
+  })();
+  const officialSeason = range === 'season' ? seasonLong : undefined;
   const scorers = useMemo(
     () =>
-      players
-        .map((p) => ({ p, s: scorerStats(p, allInRange, range === 'all') }))
-        .filter((x) => x.s.goals || x.s.assists || x.s.yellow || x.s.red)
-        .sort((a, b) => b.s.goals - a.s.goals || b.s.assists - a.s.assists),
-    [players, allInRange, range],
+      leagueScorers(players, allInRange, officialSeason)
+        .filter((x) => x.goals || x.assists || x.yellow || x.red)
+        .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.apps - b.apps || a.p.name.localeCompare(b.p.name, 'de')),
+    [players, allInRange, officialSeason],
   );
+  const hasOfficial = scorers.some((x) => x.official);
+  const snapshotFits = FUSSBALLDE_SNAPSHOT.season === seasonLong;
+  const snapshotNewer = snapshotFits && !players.some((p) => p.ext?.season === seasonLong && p.ext.updatedAt >= FUSSBALLDE_SNAPSHOT.updatedAt);
+  const [importing, setImporting] = useState(false);
+  const importSnapshot = async () => {
+    setImporting(true);
+    const ext = (r: [string, number, number, number]) => ({ season: FUSSBALLDE_SNAPSHOT.season, source: FUSSBALLDE_SNAPSHOT.source, apps: r[1], minutes: r[2], goals: r[3], updatedAt: FUSSBALLDE_SNAPSHOT.updatedAt });
+    const used = new Set<string>();
+    let updated = 0;
+    let added = 0;
+    for (const r of FUSSBALLDE_SNAPSHOT.rows) {
+      const match = allPlayers.find((p) => !used.has(p.id) && sameName(p.name, r[0]));
+      if (match) {
+        used.add(match.id);
+        await savePlayer({ ...match, ext: ext(r) });
+        updated++;
+      } else if (r[3] > 0) {
+        await savePlayer({ id: newId(), name: r[0], ext: ext(r) });
+        added++;
+      }
+    }
+    setImporting(false);
+    toast(`Torschützen übernommen: ${updated} Spieler aktualisiert${added ? `, ${added} neu im Kader` : ''}.`);
+  };
 
-  const official = players
-    .filter((p) => p.ext && (p.ext.apps !== undefined || p.ext.goals !== undefined))
-    .sort((a, b) => (b.ext!.goals ?? 0) - (a.ext!.goals ?? 0) || (b.ext!.minutes ?? 0) - (a.ext!.minutes ?? 0));
   const record = matchRecord(allInRange);
   const comps = (
     [
@@ -67,10 +96,11 @@ export function StatsView() {
   })();
 
   const exportCSV = async () => {
-    const head = ['Spieler', 'Quote %', 'Dabei', 'Entschuldigt', 'Unentschuldigt', 'Unsicher', 'Verletzt', 'Tore', 'Vorlagen', 'Gelb', 'Rot'];
+    const head = ['Spieler', 'Quote %', 'Dabei', 'Entschuldigt', 'Unentschuldigt', 'Unsicher', 'Verletzt', 'Tore (Liga)', 'Spiele (Liga)', 'Vorlagen', 'Gelb', 'Rot'];
+    const league = new Map(leagueScorers(players, allInRange, officialSeason).map((x) => [x.p.id, x]));
     const data = rows.map(({ p, s }) => {
-      const sc = scorerStats(p, allInRange, range === 'all');
-      return [p.name, s.rate ?? '', s.present, s.excused, s.absent, s.unsure, s.injured, sc.goals, sc.assists, sc.yellow, sc.red];
+      const sc = league.get(p.id)!;
+      return [p.name, s.rate ?? '', s.present, s.excused, s.absent, s.unsure, s.injured, sc.goals, sc.apps, sc.assists, sc.yellow, sc.red];
     });
     await saveFile(`teamtime-auswertung-${todayISO()}.csv`, toCSV([head, ...data]), 'text/csv');
     toast('Tabelle exportiert.');
@@ -114,16 +144,17 @@ export function StatsView() {
         ...(scorers.length
           ? [
               {
-                heading: 'Torschützen & Karten',
+                heading: 'Torschützen Punktspiele',
+                note: hasOfficial ? `Tore und Einsätze laut ${FUSSBALLDE_SNAPSHOT.source}` : 'In der App erfasste Punktspiele',
                 columns: [
                   { title: 'Spieler', width: 4 },
                   { title: 'Tore', width: 1, align: 'right' as const },
+                  { title: 'Spiele', width: 1, align: 'right' as const },
+                  { title: 'Minuten', width: 1.2, align: 'right' as const },
                   { title: 'Vorlagen', width: 1.2, align: 'right' as const },
-                  { title: 'Gelb', width: 1, align: 'right' as const },
-                  { title: 'Rot', width: 1, align: 'right' as const },
-                  { title: 'Einsätze', width: 1.2, align: 'right' as const },
                 ],
-                rows: scorers.map(({ p, s }) => [p.name, s.goals, s.assists, s.yellow || '', s.red || '', s.matches]),
+                rows: scorers.map((x) => [x.p.name, x.goals, x.apps, x.minutes ?? '', x.assists || '']),
+                footer: ['Gesamt', scorers.reduce((n, x) => n + x.goals, 0), '', '', ''],
               },
             ]
           : []),
@@ -132,41 +163,6 @@ export function StatsView() {
     await savePDF(`anwesenheit-${todayISO()}.pdf`, bytes);
     toast('Bericht erstellt.');
   };
-
-  const officialTable = official.length > 0 && (
-                <section className="section">
-                  <div className="section-head">
-                    <h2>Einsätze & Tore</h2>
-                    <span className="small muted">
-                      Saison {official[0].ext!.season} laut {official[0].ext!.source}
-                    </span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th className="rank">#</th>
-                          <th>Spieler</th>
-                          <th className="r">Einsätze</th>
-                          <th className="r">Minuten</th>
-                          <th className="r">Tore</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {official.map((p, i) => (
-                          <tr key={p.id} onClick={() => go({ tab: 'team', playerId: p.id })} style={{ cursor: 'pointer' }}>
-                            <td className="rank">{i + 1}</td>
-                            <td className="name">{p.name}</td>
-                            <td className="r">{p.ext!.apps ?? '–'}</td>
-                            <td className="r">{p.ext!.minutes ?? '–'}</td>
-                            <td className="r num strong">{p.ext!.goals ?? '–'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              );
 
   const sortBtn = (k: SortKey, label: string, cls = 'r') => (
     <th className={cls}>
@@ -223,7 +219,6 @@ export function StatsView() {
             Sobald vergangene Termine Zusagen haben, siehst du hier Quoten, Torschützen und die Bilanz.
           </Empty>
         </div>
-        {officialTable}
         </>
       ) : (
         <>
@@ -350,15 +345,26 @@ export function StatsView() {
                 <ParticipationChart events={evs} players={players} onOpen={(id) => go({ tab: 'events', eventId: id })} />
               </section>
 
-              {officialTable}
-
               <section className="section">
                 <div className="section-head">
-                  <h2>{official.length ? 'In der App erfasst' : 'Torschützen & Karten'}</h2>
-                  {range !== 'all' && <span className="small muted">nur in der App erfasste Spiele</span>}
+                  <h2>Torschützen Punktspiele</h2>
+                  <span className="small muted">
+                    {hasOfficial ? `Tore & Einsätze laut ${FUSSBALLDE_SNAPSHOT.source}` : 'in der App erfasste Punktspiele'}
+                  </span>
                 </div>
+                {range === 'season' && snapshotNewer && (
+                  <div className="banner banner-info" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Icon name="trophy" />
+                    <span className="grow">
+                      Torschützen der Punktspiele von fussball.de übernehmen (Stand {formatDateNumeric(FUSSBALLDE_SNAPSHOT.updatedAt)}, {FUSSBALLDE_SNAPSHOT.rows.reduce((n, r) => n + r[3], 0)} Tore).
+                    </span>
+                    <button className="btn btn-sm btn-primary" disabled={importing} onClick={importSnapshot}>
+                      {importing ? 'Einen Moment …' : 'Übernehmen'}
+                    </button>
+                  </div>
+                )}
                 {scorers.length === 0 ? (
-                  <p className="muted small">Noch keine Tore eingetragen. Das geht im Spiel unter „Spiel & Aufstellung“.</p>
+                  <p className="muted small">Noch keine Tore in Punktspielen eingetragen. Das geht im Spiel unter „Spiel & Aufstellung“.</p>
                 ) : (
                   <div className="table-wrap">
                     <table className="data">
@@ -367,30 +373,42 @@ export function StatsView() {
                           <th className="rank">#</th>
                           <th>Spieler</th>
                           <th className="r">Tore</th>
-                          <th className="r">Vorlagen</th>
-                          <th className="r">Scorer</th>
-                          <th className="r">Gelb</th>
-                          <th className="r">Rot</th>
-                          <th className="r">Einsätze</th>
+                          <th className="r">Spiele</th>
+                          <th className="r hide-sm">Minuten</th>
+                          <th className="r hide-sm">Vorlagen</th>
+                          <th className="r hide-sm">Gelb</th>
+                          <th className="r hide-sm">Rot</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {scorers.map(({ p, s }, i) => (
-                          <tr key={p.id} onClick={() => go({ tab: 'team', playerId: p.id })} style={{ cursor: 'pointer' }}>
+                        {scorers.map((x, i) => (
+                          <tr key={x.p.id} onClick={() => go({ tab: 'team', playerId: x.p.id })} style={{ cursor: 'pointer' }}>
                             <td className="rank">{i + 1}</td>
-                            <td className="name">{p.name}</td>
-                            <td className="r num strong">{s.goals}</td>
-                            <td className="r">{s.assists}</td>
-                            <td className="r">{s.goals + s.assists}</td>
-                            <td className="r">{s.yellow || ''}</td>
-                            <td className="r">{s.red || ''}</td>
-                            <td className="r">{s.matches}</td>
+                            <td className="name">{x.p.name}</td>
+                            <td className="r num strong">{x.goals}</td>
+                            <td className="r">{x.apps}</td>
+                            <td className="r hide-sm">{x.minutes ?? '–'}</td>
+                            <td className="r hide-sm">{x.assists || ''}</td>
+                            <td className="r hide-sm">{x.yellow || ''}</td>
+                            <td className="r hide-sm">{x.red || ''}</td>
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr>
+                          <td />
+                          <td className="name">Gesamt</td>
+                          <td className="r num strong">{scorers.reduce((n, x) => n + x.goals, 0)}</td>
+                          <td colSpan={5} />
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 )}
+                <p className="small muted" style={{ marginTop: 8 }}>
+                  Nur Punktspiele – Pokal- und Testspiele zählen hier nicht mit.
+                  {hasOfficial ? ' Vorlagen und Karten stammen aus den in der App erfassten Spielen.' : ''}
+                </p>
               </section>
             </>
           )}

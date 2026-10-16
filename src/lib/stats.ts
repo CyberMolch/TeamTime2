@@ -69,7 +69,7 @@ export interface ScorerStats {
   starts: number;
 }
 
-export function scorerStats(player: Player, events: TeamEvent[], includeManual = true): ScorerStats {
+export function scorerStats(player: Player, events: TeamEvent[], includeManual = true, types?: EventType[]): ScorerStats {
   const s: ScorerStats = {
     goals: includeManual ? player.goals || 0 : 0,
     assists: includeManual ? player.assists || 0 : 0,
@@ -79,7 +79,7 @@ export function scorerStats(player: Player, events: TeamEvent[], includeManual =
     starts: 0,
   };
   for (const e of events) {
-    if (!isMatch(e.type)) continue;
+    if (!isMatch(e.type) || (types && !types.includes(e.type))) continue;
     const m = e.scorers?.[player.id];
     if (m) {
       s.goals += m.goals || 0;
@@ -150,4 +150,34 @@ export const byName = (a: Player, b: Player) => a.name.localeCompare(b.name, 'de
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+export interface LeagueScorer {
+  p: Player;
+  goals: number;
+  apps: number;
+  minutes?: number;
+  assists: number;
+  yellow: number;
+  red: number;
+  official: boolean;
+}
+
+/** Torschützen der Punktspiele: offizielle Zahlen (fussball.de) für die laufende Saison,
+ *  sonst die in der App erfassten Punktspiele. Vorlagen und Karten immer aus der App. */
+export function leagueScorers(players: Player[], events: TeamEvent[], officialSeason?: string): LeagueScorer[] {
+  return players.map((p) => {
+    const app = scorerStats(p, events, false, ['match']);
+    const ext = officialSeason && p.ext?.season === officialSeason ? p.ext : undefined;
+    return {
+      p,
+      goals: ext?.goals ?? app.goals,
+      apps: ext?.apps ?? app.matches,
+      minutes: ext?.minutes,
+      assists: app.assists,
+      yellow: app.yellow,
+      red: app.red,
+      official: !!ext,
+    };
+  });
 }

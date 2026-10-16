@@ -2263,3 +2263,8 @@ a.link {
     margin: 2px 0 0;
   }
 }
+table.data tfoot td {
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 0;
+  background: var(--surface-2);
+}
