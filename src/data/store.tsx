@@ -184,8 +184,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const b = need();
       await b.deletePlayer(id);
       // Spieler aus der Trikot-Reihenfolge entfernen; Termine behalten die Historie
-      if (data.club.jerseyRotation?.includes(id))
-        await b.saveClub({ jerseyRotation: data.club.jerseyRotation.filter((x) => x !== id) });
+      const rot: Partial<typeof data.club> = {};
+      if (data.club.jerseyRotation?.includes(id)) rot.jerseyRotation = data.club.jerseyRotation.filter((x) => x !== id);
+      if (data.club.cabinRotation?.includes(id)) rot.cabinRotation = data.club.cabinRotation.filter((x) => x !== id);
+      if (Object.keys(rot).length) await b.saveClub(rot);
     },
     saveEvent: (e) => need().saveEvents([e]),
     saveEvents: (es) => need().saveEvents(es),

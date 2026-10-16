@@ -46,6 +46,7 @@ export function PlayerDetail({ id }: { id: string }) {
   const fines = fineBalance((club.fines || []).filter((f) => f.playerId === p.id));
   const history = [...evs].reverse().filter((e) => e.attendance[p.id] && e.attendance[p.id] !== 'none').slice(0, 12);
   const jerseys = events.filter((e) => e.jerseyDuty?.playerId === p.id).length;
+  const cabins = events.filter((e) => e.cabinDuty?.playerIds.includes(p.id)).length;
   const phone = p.phone?.replace(/[^\d+]/g, '');
   const waPhone = phone?.startsWith('+') ? phone.slice(1) : phone?.startsWith('00') ? phone.slice(2) : phone?.startsWith('0') ? '49' + phone.slice(1) : phone;
 
@@ -262,6 +263,8 @@ export function PlayerDetail({ id }: { id: string }) {
               <dd>{euro(fines.paid)}</dd>
               <dt>Trikots gewaschen</dt>
               <dd>{jerseys}×</dd>
+              <dt>Kabine gemacht</dt>
+              <dd>{cabins}×</dd>
             </dl>
           </button>
           {(p.phone || p.email) && (

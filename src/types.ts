@@ -65,6 +65,12 @@ export interface JerseyDuty {
   returnedAt?: string; // ISO – wann sie gewaschen zurückkamen
 }
 
+/** Kabinenreinigung nach einem Spiel – zwei Spieler */
+export interface CabinDuty {
+  playerIds: string[];
+  doneAt?: string; // ISO – wann erledigt
+}
+
 export interface TeamEvent {
   id: string;
   title: string;
@@ -83,6 +89,7 @@ export interface TeamEvent {
   bench?: string[];
   scorers?: Record<string, MatchStat>;
   jerseyDuty?: JerseyDuty;
+  cabinDuty?: CabinDuty;
   cancelled?: boolean;
   seriesId?: string;
   // Altfelder
@@ -131,6 +138,8 @@ export interface ClubSettings {
   fees?: FeeSettings;
   // Trikots
   jerseyRotation?: string[]; // Reihenfolge der Spieler-IDs
+  // Kabinenreinigung
+  cabinRotation?: string[];
 }
 
 export interface FeeSettings {

@@ -24,6 +24,6 @@ export const TABS: { tab: Tab; label: string; icon: string; mobile?: boolean }[]
   { tab: 'stats', label: 'Auswertung', icon: 'chart' },
   { tab: 'scorers', label: 'Torschützen', icon: 'trophy' },
   { tab: 'cards', label: 'Karten', icon: 'cards' },
-  { tab: 'jerseys', label: 'Trikots', icon: 'shirt' },
+  { tab: 'jerseys', label: 'Dienste', icon: 'shirt' },
   { tab: 'settings', label: 'Einstellungen', icon: 'settings' },
 ];

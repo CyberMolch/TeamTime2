@@ -40,7 +40,9 @@ export function eventShareText(e: TeamEvent, players: Player[], clubName?: strin
     if (missing.length) lines.push(`❌ Nicht dabei (${missing.length}): ${missing.join(', ')}`);
     if (open.length) lines.push(`⏳ Noch keine Rückmeldung (${open.length}): ${open.join(', ')}`);
   }
-  if (e.jerseyDuty?.playerId) lines.push('', `👕 Trikots: ${name(e.jerseyDuty.playerId)}`);
+  if (e.jerseyDuty?.playerId || e.cabinDuty?.playerIds.length) lines.push('');
+  if (e.jerseyDuty?.playerId) lines.push(`👕 Trikots: ${name(e.jerseyDuty.playerId)}`);
+  if (e.cabinDuty?.playerIds.length) lines.push(`🧹 Kabine: ${e.cabinDuty.playerIds.map(name).join(' & ')}`);
   if (clubName) lines.push('', `– ${clubName}`);
   return lines.join('\n');
 }

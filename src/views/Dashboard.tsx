@@ -11,7 +11,7 @@ import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, useDialog } from '../components/ui';
 import { AttendanceBar } from '../components/AttendanceBar';
 import { EventRow, ResultBadge } from '../components/EventRow';
-import { nextJerseyCandidate } from './Jerseys';
+import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
 
 export function Dashboard() {
   const { players, events, club } = useStore();
@@ -55,6 +55,7 @@ export function Dashboard() {
   });
 
   const jerseyNext = nextJerseyCandidate(players, events, club.jerseyRotation);
+  const cabinNext = nextCabinPair(players, events, club.cabinRotation);
 
   const share = async (e: TeamEvent) => {
     const r = await shareText(eventHeading(e), eventShareText(e, players, club.clubName));
@@ -171,7 +172,7 @@ export function Dashboard() {
               <div className="next-up">
                 <Icon name="shirt" size={28} className="muted" />
                 <div className="grow">
-                  <div className="small muted">Trikots fürs nächste Spiel</div>
+                  <div className="small muted">Trikots &amp; Kabine fürs nächste Spiel</div>
                   {nextMatch.jerseyDuty?.playerId ? (
                     <div className="big">{players.find((p) => p.id === nextMatch.jerseyDuty!.playerId)?.name || 'Unbekannt'}</div>
                   ) : jerseyNext ? (
@@ -179,9 +180,19 @@ export function Dashboard() {
                   ) : (
                     <div className="big muted">Noch offen</div>
                   )}
+                  <div className="small" style={{ marginTop: 2 }}>
+                    <Icon name="sparkle" size={14} className="muted" />{' '}
+                    {nextMatch.cabinDuty?.playerIds.length ? (
+                      <>Kabine: {nextMatch.cabinDuty.playerIds.map((id) => players.find((p) => p.id === id)?.name || 'Unbekannt').join(' & ')}</>
+                    ) : cabinNext.length ? (
+                      <span className="muted">Kabine: {cabinNext.map((p) => p.name).join(' & ')}?</span>
+                    ) : (
+                      <span className="muted">Kabine noch offen</span>
+                    )}
+                  </div>
                 </div>
                 <button className="btn btn-sm" onClick={() => go({ tab: 'jerseys' })}>
-                  {nextMatch.jerseyDuty?.playerId ? 'Ändern' : 'Festlegen'}
+                  {nextMatch.jerseyDuty?.playerId && nextMatch.cabinDuty?.playerIds.length ? 'Ändern' : 'Festlegen'}
                 </button>
               </div>
             </div>

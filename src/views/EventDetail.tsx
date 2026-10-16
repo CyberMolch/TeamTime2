@@ -11,7 +11,7 @@ import { Avatar, Empty, Field, Sheet, StatusDot, useDialog } from '../components
 import { DateTile } from '../components/EventRow';
 import { EventForm } from '../components/EventForm';
 import { AttendanceBar } from '../components/AttendanceBar';
-import { nextJerseyCandidate } from './Jerseys';
+import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
 import { exportCalendar } from '../lib/reminders';
 
 const QUICK: { st: AttendanceStatus; icon: string }[] = [
@@ -117,7 +117,7 @@ export function EventDetail({ id }: { id: string }) {
   };
 
   const duplicate = () => {
-    const copy: TeamEvent = { ...e, id: newId(), date: todayISO() > e.date ? todayISO() : e.date, attendance: {}, result: undefined, scorers: undefined, lineup: undefined, bench: undefined, jerseyDuty: undefined, cancelled: false, seriesId: undefined };
+    const copy: TeamEvent = { ...e, id: newId(), date: todayISO() > e.date ? todayISO() : e.date, attendance: {}, result: undefined, scorers: undefined, lineup: undefined, bench: undefined, jerseyDuty: undefined, cabinDuty: undefined, cancelled: false, seriesId: undefined };
     saveEvent(copy);
     setMenu(false);
     go({ tab: 'events', eventId: copy.id });
@@ -441,6 +441,14 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
   const ownName = club.teamName ? `${club.clubName} ${club.teamName}` : club.clubName;
   const homeFirst = e.home !== false;
   const jerseySuggest = useMemo(() => nextJerseyCandidate(players, events, club.jerseyRotation), [players, events, club.jerseyRotation]);
+  const cabinSuggest = useMemo(() => nextCabinPair(players, events.filter((x) => x.id !== e.id), club.cabinRotation), [players, events, club.cabinRotation, e.id]);
+  const cabin = e.cabinDuty?.playerIds || [];
+  const setCabin = (slot: number, id: string) => {
+    const ids = [...cabin];
+    ids[slot] = id;
+    const clean = [...new Set(ids.filter(Boolean))];
+    saveEvent({ ...e, cabinDuty: clean.length ? { playerIds: clean, doneAt: e.cabinDuty?.doneAt } : undefined });
+  };
 
   const ownInput = <input inputMode="numeric" aria-label="Eigene Tore" value={own} onChange={(x) => setOwn(x.target.value.replace(/\D/g, '').slice(0, 2))} onBlur={saveResult} />;
   const oppInput = <input inputMode="numeric" aria-label="Tore Gegner" value={opp} onChange={(x) => setOpp(x.target.value.replace(/\D/g, '').slice(0, 2))} onBlur={saveResult} />;
@@ -596,6 +604,46 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
                 }
               >
                 Gewaschen zurück
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <div className="section-head">
+          <h2>Kabinenreinigung</h2>
+          <span className="small muted">zu zweit</span>
+        </div>
+        <div className="panel panel-pad" style={{ display: 'grid', gap: 12 }}>
+          <div className="cabin-pick">
+            {[0, 1].map((slot) => (
+              <Field key={slot} label={`${slot + 1}. Spieler`}>
+                <select value={cabin[slot] || ''} onChange={(x) => setCabin(slot, x.target.value)}>
+                  <option value="">{slot === 0 ? 'Noch niemand' : '–'}</option>
+                  {players
+                    .filter((p) => p.id !== cabin[1 - slot])
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            ))}
+          </div>
+          {!cabin.length && cabinSuggest.length > 0 && (
+            <button className="btn btn-sm" style={{ justifySelf: 'start' }} onClick={() => saveEvent({ ...e, cabinDuty: { playerIds: cabinSuggest.map((p) => p.id) } })}>
+              {cabinSuggest.map((p) => p.name).join(' & ')} eintragen
+            </button>
+          )}
+          {cabin.length > 0 && (
+            <div className="chips">
+              <button
+                className={'chip' + (e.cabinDuty?.doneAt ? ' on' : '')}
+                onClick={() => saveEvent({ ...e, cabinDuty: { playerIds: cabin, doneAt: e.cabinDuty?.doneAt ? undefined : nowISOString() } })}
+              >
+                Kabine erledigt
               </button>
             </div>
           )}
