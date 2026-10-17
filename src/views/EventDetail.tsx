@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { AttendanceStatus, Fine, MatchStat, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
+import { AttendanceStatus, Fine, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { formatDate, isOver, nowISOString, relativeDay, todayISO } from '../lib/dates';
 import { countStatus, euro, parseResult } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
@@ -12,6 +12,7 @@ import { DateTile } from '../components/EventRow';
 import { EventForm } from '../components/EventForm';
 import { AttendanceBar } from '../components/AttendanceBar';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
+import { GameUpdateSheet } from '../components/GameUpdate';
 import { exportCalendar } from '../lib/reminders';
 
 const QUICK: { st: AttendanceStatus; icon: string }[] = [
@@ -425,17 +426,7 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
   const candidates = roster.filter(
     (p) => !onlyAvailable || ['present', 'unsure'].includes(e.attendance[p.id] || '') || lineup.includes(p.id) || bench.includes(p.id),
   );
-  const involved = roster.filter((p) => lineup.includes(p.id) || bench.includes(p.id) || e.attendance[p.id] === 'present' || e.scorers?.[p.id]);
-
-  const setStat = (pid: string, key: keyof MatchStat, delta: number) => {
-    const cur: MatchStat = { goals: 0, assists: 0, ...(e.scorers?.[pid] || {}) };
-    const v = Math.max(0, (cur[key] || 0) + delta);
-    const next = { ...cur, [key]: v };
-    const scorers = { ...(e.scorers || {}) };
-    if (!next.goals && !next.assists && !next.yellow && !next.yellowRed && !next.red) delete scorers[pid];
-    else scorers[pid] = next;
-    saveEvent({ ...e, scorers });
-  };
+  const [updating, setUpdating] = useState(false);
   const goalsLogged = Object.values(e.scorers || {}).reduce((s, m) => s + (m.goals || 0), 0);
 
   const ownName = club.teamName ? `${club.clubName} ${club.teamName}` : club.clubName;
@@ -510,57 +501,32 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
 
       <section>
         <div className="section-head">
-          <h2>Tore, Vorlagen, Karten</h2>
+          <h2>Tore & Karten</h2>
           {parsed && <span className="small muted">{goalsLogged} von {parsed[0]} Toren zugeordnet</span>}
         </div>
-        {involved.length === 0 ? (
-          <p className="muted small">Sobald Spieler zugesagt haben oder aufgestellt sind, kannst du hier Tore und Karten eintragen.</p>
-        ) : (
-          <div className="list ms-list">
-            {involved.map((p) => {
-              const m = e.scorers?.[p.id];
-              const toggle = (k: 'yellow' | 'yellowRed' | 'red') => setStat(p.id, k, m?.[k] ? -(m[k] || 0) : 1);
-              return (
-                <div className="ms-row" key={p.id}>
-                  <span className="ms-name">{p.name}</span>
-                  <span className="ms-controls">
-                    <span className="ms-field">
-                      <small>Tore</small>
-                      <Stepper value={m?.goals || 0} onChange={(d) => setStat(p.id, 'goals', d)} label={`Tore ${p.name}`} />
-                    </span>
-                    <span className="ms-field">
-                      <small>Vorl.</small>
-                      <Stepper value={m?.assists || 0} onChange={(d) => setStat(p.id, 'assists', d)} label={`Vorlagen ${p.name}`} />
-                    </span>
-                    <span className="ms-cards" role="group" aria-label={`Karten ${p.name}`}>
-                      {(
-                        [
-                          ['yellow', 'card-y', 'Gelbe Karte'],
-                          ['yellowRed', 'card-yr', 'Gelb-Rote Karte'],
-                          ['red', 'card-r', 'Rote Karte'],
-                        ] as const
-                      ).map(([k, cls, label]) => (
-                        <button
-                          key={k}
-                          className={'card-btn' + (m?.[k] ? ' on' : '')}
-                          onClick={() => {
-                            haptic();
-                            toggle(k);
-                          }}
-                          aria-pressed={!!m?.[k]}
-                          aria-label={`${label} ${p.name}`}
-                          title={label}
-                        >
-                          <i className={`card-ico ${cls}`} />
-                        </button>
-                      ))}
-                    </span>
+        <div className="panel panel-pad" style={{ display: 'grid', gap: 10 }}>
+          {Object.keys(e.scorers || {}).length > 0 ? (
+            <div className="lg-facts small" style={{ margin: 0 }}>
+              {Object.entries(e.scorers || {})
+                .filter(([, m]) => m.goals || m.yellow || m.yellowRed || m.red)
+                .map(([pid, m]) => (
+                  <span key={pid}>
+                    <b>{players.find((p) => p.id === pid)?.name || 'Unbekannt'}</b>
+                    {m.goals ? ` · ${m.goals} ${m.goals === 1 ? 'Tor' : 'Tore'}` : ''}
+                    {m.yellow ? <i className="card-ico card-y" style={{ marginLeft: 6 }} /> : null}
+                    {m.yellowRed ? <i className="card-ico card-yr" style={{ marginLeft: 6 }} /> : null}
+                    {m.red ? <i className="card-ico card-r" style={{ marginLeft: 6 }} /> : null}
                   </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                ))}
+            </div>
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>Nach dem Spiel trägst du hier Ergebnis, Torschützen und Karten auf einmal ein.</p>
+          )}
+          <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => setUpdating(true)}>
+            <Icon name="repeat" size={16} /> Tore & Karten aktualisieren
+          </button>
+        </div>
+        {updating && <GameUpdateSheet eventId={e.id} onClose={() => setUpdating(false)} />}
       </section>
 
       <section>
@@ -653,16 +619,3 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
   );
 }
 
-function Stepper({ value, onChange, label }: { value: number; onChange: (delta: number) => void; label: string }) {
-  return (
-    <span className="stepper">
-      <button onClick={() => onChange(-1)} disabled={!value} aria-label={`${label} verringern`}>
-        −
-      </button>
-      <span>{value || '·'}</span>
-      <button onClick={() => onChange(1)} aria-label={`${label} erhöhen`}>
-        +
-      </button>
-    </span>
-  );
-}

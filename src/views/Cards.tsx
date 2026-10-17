@@ -5,6 +5,8 @@ import { CardCount, Player } from '../types';
 import { currentSeasonStart, nextSeasonStart, seasonKey } from '../lib/dates';
 import { addCards, CardScope, cardTotals, matchCards } from '../lib/stats';
 import { Empty, PageHead, Segmented, useDialog } from '../components/ui';
+import { Icon } from '../components/Icon';
+import { GameUpdateSheet } from '../components/GameUpdate';
 
 // Karten-Seite: Pro Spieler einfach die Anzahl Gelb, Gelb-Rot und Rot eintragen.
 // Die Zahl im Feld ist immer die Gesamtzahl der Saison. Karten, die zusätzlich in einzelnen
@@ -22,6 +24,7 @@ export function CardsView() {
   const { go } = useNav();
   const { toast } = useDialog();
   const [scope, setScope] = useState<CardScope>('match');
+  const [updating, setUpdating] = useState(false);
   const from = currentSeasonStart(club.seasonStart);
   const to = nextSeasonStart(from);
   const season = seasonKey(from);
@@ -44,7 +47,16 @@ export function CardsView() {
 
   return (
     <>
-      <PageHead title="Karten" sub={`Saison ${season} · Zahl antippen und eintragen`} />
+      <PageHead
+        title="Karten"
+        sub={`Saison ${season} · Zahl antippen und eintragen`}
+        actions={
+          <button className="btn btn-sm btn-primary" onClick={() => setUpdating(true)}>
+            <Icon name="repeat" size={18} /> Nach Spiel aktualisieren
+          </button>
+        }
+      />
+      {updating && <GameUpdateSheet onClose={() => setUpdating(false)} />}
       <div className="toolbar">
         <Segmented
           label="Wettbewerb"
@@ -112,7 +124,7 @@ export function CardsView() {
         </div>
       )}
       <p className="small muted" style={{ marginTop: 10 }}>
-        Die Zahl ist die Gesamtzahl der Saison {season}. Karten, die du bei einem Spiel unter „Spiel & Aufstellung“ einträgst, zählen automatisch mit. Pokalkarten
+        Die Zahl ist die Gesamtzahl der Saison {season}. Karten, die du über „Nach Spiel aktualisieren“ einträgst, zählen automatisch mit. Pokalkarten
         werden getrennt gezählt.
       </p>
     </>

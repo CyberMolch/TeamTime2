@@ -10,6 +10,7 @@ import { buildReport, savePDF } from '../lib/pdf';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, PageHead, useDialog } from '../components/ui';
 import { CardInput } from './Cards';
+import { GameUpdateSheet } from '../components/GameUpdate';
 
 // Torschützen der Punktspiele (Liga) der laufenden Saison.
 // Quelle: fussball.de-Stand bzw. eigene Eingabe; ohne beides die in der App erfassten Punktspiele.
@@ -20,6 +21,7 @@ export function ScorersView() {
   const { toast } = useDialog();
   const [editing, setEditing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const seasonStart = currentSeasonStart(club.seasonStart);
   const season = seasonKey(seasonStart);
   const evs = useMemo(() => pastEvents(events, { from: seasonStart }), [events, seasonStart]);
@@ -86,6 +88,11 @@ export function ScorersView() {
         sub={`Punktspiele · Saison ${season}`}
         actions={
           <>
+            {!editing && (
+              <button className="btn btn-sm btn-primary" onClick={() => setUpdating(true)}>
+                <Icon name="repeat" size={18} /> Aktualisieren
+              </button>
+            )}
             {!editing && scorers.length > 0 && (
               <button className="btn btn-sm" onClick={exportPDF}>
                 <Icon name="download" size={18} /> PDF
@@ -98,6 +105,7 @@ export function ScorersView() {
         }
       />
 
+      {updating && <GameUpdateSheet onClose={() => setUpdating(false)} />}
       {snapshotIsNewer(allPlayers, season) && (
         <div className="banner banner-info" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
           <Icon name="trophy" />

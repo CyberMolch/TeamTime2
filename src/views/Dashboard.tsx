@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { TYPE_LABEL, TeamEvent, isMatch } from '../types';
@@ -10,21 +10,23 @@ import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
 import { Avatar, Empty, Meter, useDialog } from '../components/ui';
 import { AttendanceBar } from '../components/AttendanceBar';
-import { EventRow, ResultBadge } from '../components/EventRow';
+import { EventRow } from '../components/EventRow';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
+import { GameUpdateSheet, LastGameCard } from '../components/GameUpdate';
 
 export function Dashboard() {
   const { players, events, club } = useStore();
   const { go } = useNav();
   const { toast } = useDialog();
   const today = todayISO();
+  const [updating, setUpdating] = useState(false);
 
   const upcoming = useMemo(() => events.filter((e) => !isOver(e.date, e.time)), [events]);
   const next = upcoming.find((e) => !e.cancelled);
   const nextMatch = upcoming.find((e) => !e.cancelled && isMatch(e.type));
   const seasonStart = currentSeasonStart(club.seasonStart);
   const past = useMemo(() => pastEvents(events, { from: seasonStart }), [events, seasonStart]);
-  const lastMatch = [...past].reverse().find((e) => isMatch(e.type));
+  const lastMatch = [...pastEvents(events)].reverse().find((e) => isMatch(e.type));
   const record = matchRecord(past);
 
   const recentTrainings = pastEvents(events, { from: addDays(today, -28), types: ['training'] });
@@ -109,6 +111,13 @@ export function Dashboard() {
         )
       )}
 
+      {lastMatch && (
+        <div style={{ marginTop: 16 }}>
+          <LastGameCard e={lastMatch} onUpdate={() => setUpdating(true)} />
+        </div>
+      )}
+      {updating && <GameUpdateSheet eventId={lastMatch?.id} onClose={() => setUpdating(false)} />}
+
       <div className="stats-row" style={{ marginTop: 16 }}>
         <button className="stat" onClick={() => go({ tab: 'stats' })}>
           <div className="stat-value">
@@ -148,22 +157,6 @@ export function Dashboard() {
             <p className="muted small">Keine weiteren Termine.</p>
           )}
 
-          {lastMatch && (
-            <>
-              <div className="section-head section">
-                <h2>Letztes Spiel</h2>
-              </div>
-              <button className="panel list-row" style={{ borderRadius: 16 }} onClick={() => go({ tab: 'events', eventId: lastMatch.id })}>
-                <span className="grow">
-                  <span className="title" style={{ display: 'block' }}>
-                    {eventHeading(lastMatch)}
-                  </span>
-                  <span className="sub">{relativeDay(lastMatch.date)}</span>
-                </span>
-                {lastMatch.result ? <ResultBadge result={lastMatch.result} /> : <span className="tag">Ergebnis fehlt</span>}
-              </button>
-            </>
-          )}
         </div>
 
         <div style={{ display: 'grid', gap: 16 }}>

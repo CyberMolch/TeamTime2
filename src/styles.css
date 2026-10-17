@@ -2496,3 +2496,26 @@ body {
 /* Kabinenreinigung: zwei Auswahlfelder nebeneinander */
 .cabin-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 420px) { .cabin-pick { grid-template-columns: 1fr; } }
+
+/* Letztes Spiel (Übersicht) */
+.last-game { padding: 16px 18px; display: grid; gap: 12px; border-top: 4px solid var(--line-strong); }
+.last-game.lg-win { border-top-color: var(--green); }
+.last-game.lg-loss { border-top-color: var(--rose); }
+.lg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.lg-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: center; }
+.lg-score .team { font-weight: 600; font-size: 0.95rem; line-height: 1.25; overflow-wrap: anywhere; }
+.lg-num { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lg-win .lg-num { color: var(--green-ink); }
+.lg-loss .lg-num { color: var(--rose); }
+.lg-facts { display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); }
+.lg-cards { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.lg-cards .card-ico, .lg-facts .card-ico { vertical-align: -2px; margin-right: 4px; }
+.lg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.gu-table .card-input { width: 46px; }
+@media (max-width: 500px) { .lg-num { font-size: 2rem; } .gu-table .card-input { width: 40px; height: 38px; } .gu-table td.name { font-size: 0.88rem; } }
+@media (max-width: 500px) {
+  .gu-table th, .gu-table td { padding-left: 3px !important; padding-right: 3px !important; }
+  .gu-table td.name { padding-left: 10px !important; word-break: break-word; }
+  .gu-table .card-input { width: 38px; }
+  .gu-table td.c:nth-child(2) { padding-right: 8px !important; }
+}

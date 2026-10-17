@@ -43,6 +43,8 @@ export interface ExternalStats {
   minutes?: number;
   goals?: number;
   updatedAt: string; // YYYY-MM-DD
+  /** Tore aus später aktualisierten Spielen, die schon aufgerechnet sind (Spiel-ID → Tore) */
+  added?: Record<string, number>;
 }
 
 export interface CardCount {
