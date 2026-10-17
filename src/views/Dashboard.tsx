@@ -78,22 +78,29 @@ export function Dashboard() {
       )}
 
       {birthdays.length > 0 && (
-        <div className="bday-strip" role="list" aria-label="Geburtstage">
-          {birthdays.map(({ p, inDays, turns, date }) => (
-            <div key={p.id} role="listitem" className={'bday' + (inDays === 0 ? ' bday-today' : inDays <= 7 ? ' bday-soon' : '')}>
+        <section className="panel bday-panel" aria-label="Geburtstage">
+          <div className="bday-head">
+            <Icon name="cake" size={18} />
+            <h3>Geburtstage</h3>
+            <span className="small muted">nächste 30 Tage</span>
+          </div>
+          {birthdays.slice(0, 4).map(({ p, inDays, turns, date }) => (
+            <div key={p.id} className={'bday-row' + (inDays === 0 ? ' is-today' : '')}>
               <button className="bday-main" onClick={() => go({ tab: 'team', playerId: p.id })}>
-                <span className="bday-ico">
-                  <Icon name="cake" size={inDays === 0 ? 26 : 20} />
+                <span className="bday-date">
+                  <b>{Number(date.slice(8, 10))}</b>
+                  <small>{formatDate(date).split(' ').pop()?.replace('.', '')}</small>
                 </span>
                 <span className="bday-text">
-                  <span className="bday-when">{inDays === 0 ? 'Heute Geburtstag!' : inDays === 1 ? 'Morgen' : `in ${inDays} Tagen · ${formatDate(date)}`}</span>
                   <span className="bday-name">{p.name}</span>
-                  <span className="bday-age">wird {turns}</span>
+                  <span className="bday-sub">
+                    wird {turns} · {weekdayLong(date)}
+                  </span>
                 </span>
               </button>
-              {inDays === 0 && (
+              {inDays === 0 ? (
                 <button
-                  className="btn btn-sm bday-btn"
+                  className="btn btn-sm btn-primary"
                   onClick={async () => {
                     const r = await shareText(`Geburtstag ${p.name}`, `🎉 Alles Gute zum ${turns}. Geburtstag, ${p.name.split(' ')[0]}! 🎂⚽\n– ${club.teamName ? `${club.clubName} ${club.teamName}` : club.clubName}`);
                     if (r === 'copied') toast('Glückwunsch kopiert – jetzt in WhatsApp einfügen.');
@@ -101,10 +108,17 @@ export function Dashboard() {
                 >
                   <Icon name="share" size={16} /> Gratulieren
                 </button>
+              ) : (
+                <span className={'bday-in' + (inDays <= 7 ? ' soon' : '')}>{inDays === 1 ? 'morgen' : `in ${inDays} Tagen`}</span>
               )}
             </div>
           ))}
-        </div>
+          {birthdays.length > 4 && (
+            <button className="bday-more" onClick={() => go({ tab: 'team' })}>
+              + {birthdays.length - 4} weitere
+            </button>
+          )}
+        </section>
       )}
 
       {next ? (
