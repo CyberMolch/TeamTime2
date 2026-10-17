@@ -3,12 +3,12 @@ import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { addDays, currentSeasonStart, formatDate, isOver, nextBirthday, relativeDay, seasonLabel, todayISO, weekdayLong } from '../lib/dates';
-import { attendanceFor, countStatus, euro, fineBalance, matchRecord, pastEvents } from '../lib/stats';
+import { countStatus, euro, fineBalance, matchRecord, pastEvents } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
 import { shareText } from '../lib/native';
 import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
-import { Avatar, Empty, Meter, useDialog } from '../components/ui';
+import { Empty, useDialog } from '../components/ui';
 import { AttendanceBar } from '../components/AttendanceBar';
 import { EventRow } from '../components/EventRow';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
@@ -39,22 +39,8 @@ export function Dashboard() {
   const birthdays = players
     .filter((p) => p.birthDate)
     .map((p) => ({ p, ...nextBirthday(p.birthDate!) }))
-    .filter((b) => b.inDays <= 21)
+    .filter((b) => b.inDays <= 30)
     .sort((a, b) => a.inDays - b.inDays);
-
-  // Wer war in den letzten 8 Wochen selten dabei?
-  const eightWeeks = pastEvents(events, { from: addDays(today, -56) });
-  const lowAttendance = players
-    .map((p) => ({ p, s: attendanceFor(p.id, eightWeeks) }))
-    .filter((x) => x.s.counted >= 4 && (x.s.rate ?? 100) < 50)
-    .sort((a, b) => (a.s.rate ?? 0) - (b.s.rate ?? 0))
-    .slice(0, 5);
-
-  // Verletzt: zuletzt als verletzt eingetragen
-  const injured = players.filter((p) => {
-    const last = [...events].reverse().find((e) => e.attendance?.[p.id] && e.attendance[p.id] !== 'none' && (isOver(e.date, e.time) || e.attendance[p.id] === 'injured'));
-    return last?.attendance[p.id] === 'injured';
-  });
 
   const jerseyNext = nextJerseyCandidate(players, events, club.jerseyRotation);
   const cabinNext = nextCabinPair(players, events, club.cabinRotation);
@@ -88,6 +74,36 @@ export function Dashboard() {
           >
             Trag zuerst deine Spieler ein. Danach kannst du Termine anlegen und Zusagen erfassen.
           </Empty>
+        </div>
+      )}
+
+      {birthdays.length > 0 && (
+        <div className="bday-strip" role="list" aria-label="Geburtstage">
+          {birthdays.map(({ p, inDays, turns, date }) => (
+            <div key={p.id} role="listitem" className={'bday' + (inDays === 0 ? ' bday-today' : inDays <= 7 ? ' bday-soon' : '')}>
+              <button className="bday-main" onClick={() => go({ tab: 'team', playerId: p.id })}>
+                <span className="bday-ico">
+                  <Icon name="cake" size={inDays === 0 ? 26 : 20} />
+                </span>
+                <span className="bday-text">
+                  <span className="bday-when">{inDays === 0 ? 'Heute Geburtstag!' : inDays === 1 ? 'Morgen' : `in ${inDays} Tagen · ${formatDate(date)}`}</span>
+                  <span className="bday-name">{p.name}</span>
+                  <span className="bday-age">wird {turns}</span>
+                </span>
+              </button>
+              {inDays === 0 && (
+                <button
+                  className="btn btn-sm bday-btn"
+                  onClick={async () => {
+                    const r = await shareText(`Geburtstag ${p.name}`, `🎉 Alles Gute zum ${turns}. Geburtstag, ${p.name.split(' ')[0]}! 🎂⚽\n– ${club.teamName ? `${club.clubName} ${club.teamName}` : club.clubName}`);
+                    if (r === 'copied') toast('Glückwunsch kopiert – jetzt in WhatsApp einfügen.');
+                  }}
+                >
+                  <Icon name="share" size={16} /> Gratulieren
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -191,55 +207,7 @@ export function Dashboard() {
             </div>
           )}
 
-          {birthdays.length > 0 && (
-            <div className="panel">
-              <div className="panel-pad" style={{ paddingBottom: 4 }}>
-                <h3>Geburtstage</h3>
-              </div>
-              {birthdays.map(({ p, inDays, turns, date }) => (
-                <button key={p.id} className="list-row" onClick={() => go({ tab: 'team', playerId: p.id })}>
-                  <Icon name="cake" className={inDays === 0 ? '' : 'muted'} />
-                  <span className="grow">
-                    <span className="title">{p.name}</span>
-                    <span className="sub" style={{ display: 'block' }}>
-                      {inDays === 0 ? 'Heute' : relativeDay(date)} · wird {turns}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
 
-          {(injured.length > 0 || lowAttendance.length > 0) && (
-            <div className="panel">
-              <div className="panel-pad" style={{ paddingBottom: 4 }}>
-                <h3>Im Blick behalten</h3>
-              </div>
-              {injured.map((p) => (
-                <button key={p.id} className="list-row" onClick={() => go({ tab: 'team', playerId: p.id })}>
-                  <Avatar player={p} size={32} />
-                  <span className="grow title">{p.name}</span>
-                  <span className="tag" style={{ color: 'var(--st-injured)' }}>
-                    Verletzt
-                  </span>
-                </button>
-              ))}
-              {lowAttendance.map(({ p, s }) => (
-                <button key={p.id} className="list-row" onClick={() => go({ tab: 'team', playerId: p.id })}>
-                  <Avatar player={p} size={32} />
-                  <span className="grow">
-                    <span className="title">{p.name}</span>
-                    <span className="sub" style={{ display: 'block' }}>
-                      {s.present} von {s.counted} Terminen in 8 Wochen
-                    </span>
-                  </span>
-                  <span style={{ width: 70 }}>
-                    <Meter value={s.rate} />
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </>

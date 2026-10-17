@@ -2519,3 +2519,24 @@ body {
   .gu-table .card-input { width: 38px; }
   .gu-table td.c:nth-child(2) { padding-right: 8px !important; }
 }
+
+/* Geburtstage (Übersicht) */
+:root { --bday: #b54708; --bday-soft: #fff6ed; --bday-line: #fddcab; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --bday: #fdb022; --bday-soft: #2a1f0e; --bday-line: #5c3d0e; } }
+:root[data-theme='dark'] { --bday: #fdb022; --bday-soft: #2a1f0e; --bday-line: #5c3d0e; }
+.bday-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 16px; padding: 2px 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.bday-strip::-webkit-scrollbar { display: none; }
+@media (min-width: 900px) { .bday-strip { margin: 0 0 16px; padding: 2px 0 4px; flex-wrap: wrap; overflow: visible; } }
+.bday { flex: 0 0 auto; min-width: 200px; max-width: 280px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line); }
+.bday-soon { background: var(--bday-soft); border-color: var(--bday-line); }
+.bday-today { min-width: 250px; background: linear-gradient(135deg, var(--bday-soft), var(--surface)); border: 2px solid var(--bday); box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--bday) 55%, transparent); }
+.bday-main { display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.bday-ico { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--bday-soft); color: var(--bday); border: 1px solid var(--bday-line); }
+.bday-today .bday-ico { width: 50px; height: 50px; background: var(--bday); color: #fff; border: 0; }
+.bday-text { display: flex; flex-direction: column; min-width: 0; }
+.bday-when { font-size: 0.75rem; font-weight: 600; color: var(--bday); text-transform: none; }
+.bday-today .bday-when { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.bday-name { font-weight: 700; font-size: 1rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bday-today .bday-name { font-size: 1.15rem; }
+.bday-age { font-size: 0.8rem; color: var(--muted); }
+.bday-btn { align-self: flex-start; border-color: var(--bday-line); color: var(--bday); }
