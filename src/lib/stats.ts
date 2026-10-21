@@ -203,11 +203,10 @@ export function matchCards(playerId: string, events: TeamEvent[], scope: CardSco
   return c;
 }
 
-/** Gesamtzahl = direkt eingetragen + in Spielen erfasst */
-export function cardTotals(p: Player, events: TeamEvent[], season: string, scope: CardScope, from: string, to?: string): CardCount {
-  const base = p.cards?.[`${season}|${scope}`];
-  const m = matchCards(p.id, events, scope, from, to);
-  return { yellow: (base?.yellow || 0) + m.yellow, yellowRed: (base?.yellowRed || 0) + m.yellowRed, red: (base?.red || 0) + m.red };
+/** Karten einer Saison = Summe der bei den einzelnen Spielen eingetragenen Karten.
+ *  (Früher direkt eingetragene Saisonzahlen in p.cards zählen nicht mehr mit.) */
+export function cardTotals(p: Player, events: TeamEvent[], _season: string, scope: CardScope, from: string, to?: string): CardCount {
+  return matchCards(p.id, events, scope, from, to);
 }
 
 export const addCards = (a: CardCount, b: CardCount): CardCount => ({ yellow: a.yellow + b.yellow, yellowRed: a.yellowRed + b.yellowRed, red: a.red + b.red });

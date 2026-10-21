@@ -431,8 +431,8 @@ export function StatsView() {
               <section className="section">
                 <div className="section-head">
                   <h2>Karten · Saison {seasonLabel(seasonStart)}</h2>
-                  <button className="btn btn-ghost btn-sm" onClick={() => go({ tab: 'cards' })}>
-                    <Icon name="edit" size={16} /> Eintragen
+                  <button className="btn btn-ghost btn-sm" onClick={() => go({ tab: 'results' })}>
+                    <Icon name="edit" size={16} /> Nachtragen
                   </button>
                   <Segmented
                     label="Wettbewerb"
@@ -446,7 +446,7 @@ export function StatsView() {
                   />
                 </div>
                 {cards.length === 0 ? (
-                  <p className="muted small">Keine Karten {cardScope === 'league' ? 'in Punktspielen' : cardScope === 'cup' ? 'im Pokal' : ''} eingetragen. Tippe auf „Eintragen“, um die Anzahl pro Spieler einzugeben.</p>
+                  <p className="muted small">Keine Karten {cardScope === 'league' ? 'in Punktspielen' : cardScope === 'cup' ? 'im Pokal' : ''} eingetragen. Karten trägst du beim jeweiligen Spiel ein – tippe auf „Nachtragen“.</p>
                 ) : (
                   <div className="table-wrap">
                     <table className="data">
@@ -485,6 +485,9 @@ export function StatsView() {
                     </table>
                   </div>
                 )}
+                <p className="small muted" style={{ marginTop: 8 }}>
+                  Summe der Karten, die bei den einzelnen {cardScope === 'league' ? 'Punktspielen' : cardScope === 'cup' ? 'Pokalspielen' : 'Punkt- und Pokalspielen'} eingetragen sind.
+                </p>
               </section>
             </>
           )}

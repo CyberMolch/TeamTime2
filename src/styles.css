@@ -2550,3 +2550,4 @@ body {
 .res-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .res-edit { font-size: 0.75rem; font-weight: 600; color: var(--green-ink); display: inline-flex; align-items: center; gap: 4px; }
 .res-open { align-self: center; margin-right: 6px; }
+.row-dim td { opacity: .55; }

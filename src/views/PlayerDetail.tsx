@@ -41,7 +41,7 @@ export function PlayerDetail({ id }: { id: string }) {
       const to = nextSeasonStart(seasonStart);
       return addCards(cardTotals(p, events, key, 'match', seasonStart, to), cardTotals(p, events, key, 'cup', seasonStart, to));
     }
-    return Object.values(p.cards || {}).reduce(addCards, { yellow: sc.yellow, yellowRed: sc.yellowRed, red: sc.red });
+    return { yellow: sc.yellow, yellowRed: sc.yellowRed, red: sc.red };
   })();
   const fines = fineBalance((club.fines || []).filter((f) => f.playerId === p.id));
   const history = [...evs].reverse().filter((e) => e.attendance[p.id] && e.attendance[p.id] !== 'none').slice(0, 12);

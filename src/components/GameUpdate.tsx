@@ -3,7 +3,7 @@ import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { EventType, MatchStat, Player, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { newId } from '../lib/native';
-import { currentSeasonStart, formatDate, parseDate, relativeDay, seasonKey, todayISO } from '../lib/dates';
+import { formatDate, relativeDay, todayISO } from '../lib/dates';
 import { outcome, parseResult } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
 import { CardInput } from '../views/Cards';
@@ -174,7 +174,6 @@ function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEven
     }
     await saveEvent({ ...e, result, scorers });
 
-    const cardKey = `${seasonKey(currentSeasonStart(club.seasonStart, parseDate(e.date)))}|${e.type}`;
     for (const p of players) {
       let next: Player = p;
       // Liga-Tore auf die übernommene Saisonzahl (fussball.de / eigene Eingabe) aufrechnen
@@ -186,20 +185,6 @@ function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEven
         const included = before === undefined && e.date <= ext.updatedAt;
         if (!included && (before ?? 0) !== now)
           next = { ...next, ext: { ...ext, goals: Math.max(0, (ext.goals || 0) + now - (before ?? 0)), added: { ...(ext.added || {}), [e.id]: now } } };
-      }
-      // Karten: Wurde die Saisonzahl auf der Karten-Seite nach diesem Spiel eingetragen, ist das Spiel dort
-      // schon enthalten – dann den direkt eingetragenen Teil verringern, damit nichts doppelt zählt.
-      const setAt = p.cardsSetAt?.[cardKey];
-      const base = p.cards?.[cardKey];
-      if ((e.type === 'match' || e.type === 'cup') && setAt && base && e.date <= setAt) {
-        const old = e.scorers?.[p.id];
-        const r = draft[p.id] || EMPTY;
-        const nb = {
-          yellow: Math.max(0, base.yellow - (r.yellow - (old?.yellow || 0))),
-          yellowRed: Math.max(0, base.yellowRed - (r.yellowRed - (old?.yellowRed || 0))),
-          red: Math.max(0, base.red - (r.red - (old?.red || 0))),
-        };
-        if (nb.yellow !== base.yellow || nb.yellowRed !== base.yellowRed || nb.red !== base.red) next = { ...next, cards: { ...(p.cards || {}), [cardKey]: nb } };
       }
       if (next !== p) await savePlayer(next);
     }

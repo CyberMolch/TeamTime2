@@ -2,15 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { CardCount, Player } from '../types';
-import { currentSeasonStart, nextSeasonStart, seasonKey, todayISO } from '../lib/dates';
-import { addCards, CardScope, cardTotals, matchCards } from '../lib/stats';
+import { currentSeasonStart, nextSeasonStart, seasonKey } from '../lib/dates';
+import { addCards, CardScope, cardTotals, hasCards } from '../lib/stats';
 import { Empty, PageHead, Segmented, useDialog } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { GameUpdateSheet } from '../components/GameUpdate';
 
-// Karten-Seite: Pro Spieler einfach die Anzahl Gelb, Gelb-Rot und Rot eintragen.
-// Die Zahl im Feld ist immer die Gesamtzahl der Saison. Karten, die zusätzlich in einzelnen
-// Spielen erfasst wurden, sind darin enthalten – gespeichert wird nur der Rest.
+// Karten-Seite: Summe der bei den einzelnen Spielen eingetragenen Karten (Liga und Pokal getrennt).
+// CardInput wird vom Fenster „Tore & Karten aktualisieren“ und der Torschützen-Bearbeitung genutzt.
 
 type Kind = keyof CardCount;
 const KINDS: { k: Kind; cls: string; label: string }[] = [
@@ -22,38 +21,53 @@ const KINDS: { k: Kind; cls: string; label: string }[] = [
 export function CardsView() {
   const { players, events, club, savePlayer } = useStore();
   const { go } = useNav();
-  const { toast } = useDialog();
+  const { toast, confirm } = useDialog();
   const [scope, setScope] = useState<CardScope>('match');
   const [updating, setUpdating] = useState(false);
   const from = currentSeasonStart(club.seasonStart);
   const to = nextSeasonStart(from);
   const season = seasonKey(from);
-  const key = `${season}|${scope}`;
 
   const rows = useMemo(
-    () => players.map((p) => ({ p, total: cardTotals(p, events, season, scope, from, to), inMatches: matchCards(p.id, events, scope, from, to) })),
+    () =>
+      players
+        .map((p) => ({ p, total: cardTotals(p, events, season, scope, from, to) }))
+        .sort((a, b) => b.total.red - a.total.red || b.total.yellowRed - a.total.yellowRed || b.total.yellow - a.total.yellow || a.p.name.localeCompare(b.p.name, 'de')),
     [players, events, season, scope, from, to],
   );
   const sum = rows.reduce((a, r) => addCards(a, r.total), { yellow: 0, yellowRed: 0, red: 0 } as CardCount);
+  const games = events.filter((e) => e.type === scope && e.date >= from && e.date < to && Object.values(e.scorers || {}).some((m) => m.yellow || m.yellowRed || m.red)).length;
 
-  const setTotal = (p: Player, inMatches: CardCount, k: Kind, value: number) => {
-    const base: CardCount = { yellow: 0, yellowRed: 0, red: 0, ...(p.cards?.[key] || {}) };
-    const next = { ...base, [k]: Math.max(0, value - inMatches[k]) };
-    const cards = { ...(p.cards || {}) };
-    if (!next.yellow && !next.yellowRed && !next.red) delete cards[key];
-    else cards[key] = next;
-    savePlayer({ ...p, cards, cardsSetAt: { ...(p.cardsSetAt || {}), [key]: todayISO() } });
+  // Früher direkt auf dieser Seite eingetragene Saisonzahlen (zählen nicht mehr mit)
+  const legacy = players.filter((p) => Object.entries(p.cards || {}).some(([k, c]) => k.startsWith(season) && (c.yellow || c.yellowRed || c.red)));
+  const clearLegacy = async () => {
+    if (!(await confirm(`Die früher direkt eingetragenen Kartenzahlen von ${legacy.length} Spielern werden gelöscht. Gezählt werden nur noch die Karten aus den Spielen.`, { title: 'Alte Einträge löschen?', ok: 'Löschen' }))) return;
+    for (const p of legacy) {
+      const cards = Object.fromEntries(Object.entries(p.cards || {}).filter(([k]) => !k.startsWith(season)));
+      await savePlayer({ ...p, cards });
+    }
+    toast('Alte Einträge gelöscht.');
   };
+  const legacyText = (p: Player) =>
+    Object.entries(p.cards || {})
+      .filter(([k]) => k.startsWith(season))
+      .map(([k, c]) => `${k.endsWith('cup') ? 'Pokal' : 'Liga'}: ${[c.yellow && `${c.yellow}× Gelb`, c.yellowRed && `${c.yellowRed}× Gelb-Rot`, c.red && `${c.red}× Rot`].filter(Boolean).join(', ')}`)
+      .join(' · ');
 
   return (
     <>
       <PageHead
         title="Karten"
-        sub={`Saison ${season} · Zahl antippen und eintragen`}
+        sub={`Saison ${season} · aus den eingetragenen Spielen`}
         actions={
-          <button className="btn btn-sm btn-primary" onClick={() => setUpdating(true)}>
-            <Icon name="repeat" size={18} /> Nach Spiel aktualisieren
-          </button>
+          <>
+            <button className="btn btn-sm" onClick={() => go({ tab: 'results' })}>
+              <Icon name="list" size={18} /> Ergebnisse
+            </button>
+            <button className="btn btn-sm btn-primary" onClick={() => setUpdating(true)}>
+              <Icon name="repeat" size={18} /> Nach Spiel aktualisieren
+            </button>
+          </>
         }
       />
       {updating && <GameUpdateSheet onClose={() => setUpdating(false)} />}
@@ -68,6 +82,25 @@ export function CardsView() {
           ]}
         />
       </div>
+
+      {legacy.length > 0 && (
+        <div className="banner banner-info" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Icon name="info" />
+          <span className="grow" style={{ minWidth: 220 }}>
+            <b>Früher direkt eingetragene Karten zählen nicht mehr mit.</b> Gezählt wird nur, was bei den einzelnen Spielen steht. Bitte ggf. beim jeweiligen Spiel nachtragen:
+            <span style={{ display: 'block', marginTop: 6 }}>
+              {legacy.map((p) => (
+                <span key={p.id} style={{ display: 'block' }}>
+                  {p.name} – {legacyText(p)}
+                </span>
+              ))}
+            </span>
+          </span>
+          <button className="btn btn-sm" onClick={clearLegacy}>
+            Alte Einträge löschen
+          </button>
+        </div>
+      )}
 
       {players.length === 0 ? (
         <div className="panel">
@@ -89,24 +122,16 @@ export function CardsView() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ p, total, inMatches }) => (
-                <tr key={p.id}>
+              {rows.map(({ p, total }) => (
+                <tr key={p.id} className={hasCards(total) ? '' : 'row-dim'}>
                   <td className="name">
                     <button className="fee-name" onClick={() => go({ tab: 'team', playerId: p.id })}>
                       {p.name}
                     </button>
                   </td>
-                  {KINDS.map(({ k, label }) => (
-                    <td key={k} className="c">
-                      <CardInput
-                        value={total[k]}
-                        min={inMatches[k]}
-                        label={`${label} ${p.name}`}
-                        onCommit={(v) => {
-                          if (v < inMatches[k]) toast(`${p.name} hat ${inMatches[k]}× ${label} aus erfassten Spielen – weniger geht nur dort.`);
-                          setTotal(p, inMatches, k, Math.max(v, inMatches[k]));
-                        }}
-                      />
+                  {KINDS.map(({ k }) => (
+                    <td key={k} className="c num strong">
+                      {total[k] || <span className="muted">–</span>}
                     </td>
                   ))}
                 </tr>
@@ -124,8 +149,8 @@ export function CardsView() {
         </div>
       )}
       <p className="small muted" style={{ marginTop: 10 }}>
-        Die Zahl ist die Gesamtzahl der Saison {season}. Karten, die du über „Nach Spiel aktualisieren“ einträgst, zählen automatisch mit. Pokalkarten
-        werden getrennt gezählt.
+        Summe der Karten, die bei den {scope === 'match' ? 'Punktspielen' : 'Pokalspielen'} der Saison {season} eingetragen sind ({games} {games === 1 ? 'Spiel' : 'Spiele'} mit Karten). Eintragen oder
+        korrigieren über „Nach Spiel aktualisieren“ oder unter Ergebnisse.
       </p>
     </>
   );
