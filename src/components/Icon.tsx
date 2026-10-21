@@ -88,8 +88,8 @@ export function Icon({ name, size = 20, className, stroke = 2 }: { name: IconNam
 export function InjuredMark({ size = 20, className }: { size?: number; className?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={'icon icon-injured' + (className ? ' ' + className : '')} aria-hidden="true">
-      <rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill="#fff" stroke="#d0d5dd" strokeWidth="1" />
-      <path d="M9.6 4.5h4.8v5.1h5.1v4.8h-5.1v5.1H9.6v-5.1H4.5V9.6h5.1z" fill="#e30613" />
+      <rect x="0" y="0" width="24" height="24" rx="3" fill="#fff" />
+      <path d="M9.4 3.5h5.2v5.9h5.9v5.2h-5.9v5.9H9.4v-5.9H3.5V9.4h5.9z" fill="#e30613" />
     </svg>
   );
 }
