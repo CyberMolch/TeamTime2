@@ -62,6 +62,7 @@ const P: Record<string, string[]> = {
 export type IconName = keyof typeof P;
 
 export function Icon({ name, size = 20, className, stroke = 2 }: { name: IconName | string; size?: number; className?: string; stroke?: number }) {
+  if (name === 'medical') return <InjuredMark size={size} className={className} />;
   const paths = P[name] || P.info;
   return (
     <svg
@@ -79,6 +80,16 @@ export function Icon({ name, size = 20, className, stroke = 2 }: { name: IconNam
       {paths.map((d, i) => (
         <path key={i} d={d} />
       ))}
+    </svg>
+  );
+}
+
+/** Verletzt: rotes Kreuz auf weißem Grund */
+export function InjuredMark({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={'icon icon-injured' + (className ? ' ' + className : '')} aria-hidden="true">
+      <rect x="1.5" y="1.5" width="21" height="21" rx="4.5" fill="#fff" stroke="#d0d5dd" strokeWidth="1" />
+      <path d="M9.6 4.5h4.8v5.1h5.1v4.8h-5.1v5.1H9.6v-5.1H4.5V9.6h5.1z" fill="#e30613" />
     </svg>
   );
 }
