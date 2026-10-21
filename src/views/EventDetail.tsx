@@ -72,7 +72,8 @@ export function EventDetail({ id }: { id: string }) {
   const { back, go } = useNav();
   const { toast, confirm } = useDialog();
   const e = events.find((x) => x.id === id);
-  const [tab, setTab] = useState<'att' | 'match'>('att');
+  // Vergangene Spiele öffnen direkt bei Ergebnis, Tore & Karten
+  const [tab, setTab] = useState<'att' | 'match'>(() => (e && isMatch(e.type) && isOver(e.date, e.time) ? 'match' : 'att'));
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState(false);
   const [finesFor, setFinesFor] = useState(false);
@@ -458,6 +459,36 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
 
       <section>
         <div className="section-head">
+          <h2>Tore & Karten</h2>
+          {parsed && <span className="small muted">{goalsLogged} von {parsed[0]} Toren zugeordnet</span>}
+        </div>
+        <div className="panel panel-pad" style={{ display: 'grid', gap: 10 }}>
+          {Object.keys(e.scorers || {}).length > 0 ? (
+            <div className="lg-facts small" style={{ margin: 0 }}>
+              {Object.entries(e.scorers || {})
+                .filter(([, m]) => m.goals || m.yellow || m.yellowRed || m.red)
+                .map(([pid, m]) => (
+                  <span key={pid}>
+                    <b>{players.find((p) => p.id === pid)?.name || 'Unbekannt'}</b>
+                    {m.goals ? ` · ${m.goals} ${m.goals === 1 ? 'Tor' : 'Tore'}` : ''}
+                    {m.yellow ? <i className="card-ico card-y" style={{ marginLeft: 6 }} /> : null}
+                    {m.yellowRed ? <i className="card-ico card-yr" style={{ marginLeft: 6 }} /> : null}
+                    {m.red ? <i className="card-ico card-r" style={{ marginLeft: 6 }} /> : null}
+                  </span>
+                ))}
+            </div>
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>Nach dem Spiel trägst du hier Ergebnis, Torschützen und Karten auf einmal ein.</p>
+          )}
+          <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => setUpdating(true)}>
+            <Icon name="repeat" size={16} /> Tore & Karten aktualisieren
+          </button>
+        </div>
+        {updating && <GameUpdateSheet eventId={e.id} onClose={() => setUpdating(false)} />}
+      </section>
+
+      <section>
+        <div className="section-head">
           <h2>Aufstellung</h2>
           <span className="small muted">
             Startelf <b className="num">{lineup.length}</b> · Bank <b className="num">{bench.length}</b>
@@ -499,35 +530,6 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
         </p>
       </section>
 
-      <section>
-        <div className="section-head">
-          <h2>Tore & Karten</h2>
-          {parsed && <span className="small muted">{goalsLogged} von {parsed[0]} Toren zugeordnet</span>}
-        </div>
-        <div className="panel panel-pad" style={{ display: 'grid', gap: 10 }}>
-          {Object.keys(e.scorers || {}).length > 0 ? (
-            <div className="lg-facts small" style={{ margin: 0 }}>
-              {Object.entries(e.scorers || {})
-                .filter(([, m]) => m.goals || m.yellow || m.yellowRed || m.red)
-                .map(([pid, m]) => (
-                  <span key={pid}>
-                    <b>{players.find((p) => p.id === pid)?.name || 'Unbekannt'}</b>
-                    {m.goals ? ` · ${m.goals} ${m.goals === 1 ? 'Tor' : 'Tore'}` : ''}
-                    {m.yellow ? <i className="card-ico card-y" style={{ marginLeft: 6 }} /> : null}
-                    {m.yellowRed ? <i className="card-ico card-yr" style={{ marginLeft: 6 }} /> : null}
-                    {m.red ? <i className="card-ico card-r" style={{ marginLeft: 6 }} /> : null}
-                  </span>
-                ))}
-            </div>
-          ) : (
-            <p className="muted small" style={{ margin: 0 }}>Nach dem Spiel trägst du hier Ergebnis, Torschützen und Karten auf einmal ein.</p>
-          )}
-          <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => setUpdating(true)}>
-            <Icon name="repeat" size={16} /> Tore & Karten aktualisieren
-          </button>
-        </div>
-        {updating && <GameUpdateSheet eventId={e.id} onClose={() => setUpdating(false)} />}
-      </section>
 
       <section>
         <div className="section-head">

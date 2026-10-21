@@ -2539,3 +2539,14 @@ body {
 .bday-in { flex: none; font-size: 0.78rem; font-weight: 600; color: var(--muted); padding: 3px 9px; border-radius: 999px; background: var(--fill); white-space: nowrap; }
 .bday-in.soon { color: var(--bday); background: var(--bday-soft); }
 .bday-more { display: block; width: 100%; padding: 10px 16px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--green-ink); text-align: left; cursor: pointer; }
+
+/* Ergebnisse */
+.res-row { display: flex; align-items: stretch; }
+.res-row + .res-row { border-top: 1px solid var(--line); }
+.res-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 14px; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.res-main:hover { background: var(--surface-2); }
+.res-facts { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 5px; font-size: 0.8rem; color: var(--ink-2); }
+.res-card .card-ico { vertical-align: -2px; margin-right: 3px; }
+.res-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.res-edit { font-size: 0.75rem; font-weight: 600; color: var(--green-ink); display: inline-flex; align-items: center; gap: 4px; }
+.res-open { align-self: center; margin-right: 6px; }

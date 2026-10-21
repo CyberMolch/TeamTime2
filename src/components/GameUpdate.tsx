@@ -1,13 +1,14 @@
 import { type ReactNode, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { MatchStat, Player, TYPE_LABEL, TeamEvent, isMatch } from '../types';
-import { formatDate, relativeDay, todayISO } from '../lib/dates';
+import { EventType, MatchStat, Player, TYPE_LABEL, TeamEvent, isMatch } from '../types';
+import { newId } from '../lib/native';
+import { currentSeasonStart, formatDate, parseDate, relativeDay, seasonKey, todayISO } from '../lib/dates';
 import { outcome, parseResult } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
 import { CardInput } from '../views/Cards';
 import { Icon } from './Icon';
-import { Field, Sheet, useDialog } from './ui';
+import { Field, Segmented, Sheet, useDialog } from './ui';
 
 // "Nach dem Spiel aktualisieren": Ergebnis, Tore und Karten eines Spiels als Zahlen eintragen.
 // Tore aus Punktspielen nach dem fussball.de-Stand werden auf die Saisonzahl des Spielers aufgerechnet,
@@ -28,19 +29,116 @@ export function updatableGames(events: TeamEvent[]): TeamEvent[] {
   return events.filter((e) => isMatch(e.type) && !e.cancelled && e.date <= today).sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
 }
 
-export function GameUpdateSheet({ eventId, onClose }: { eventId?: string; onClose: () => void }) {
+export function GameUpdateSheet({ eventId, startNew, onClose }: { eventId?: string; startNew?: boolean; onClose: () => void }) {
   const { events } = useStore();
   const games = useMemo(() => updatableGames(events), [events]);
   const [id, setId] = useState(eventId || games[0]?.id);
-  const e = events.find((x) => x.id === id);
-  if (!e)
+  const [creating, setCreating] = useState(!!startNew || !games.length);
+  const [pending, setPending] = useState<TeamEvent>();
+  const e = events.find((x) => x.id === id) || (pending?.id === id ? pending : undefined);
+  if (creating || !e)
     return (
-      <Sheet title="Tore & Karten aktualisieren" onClose={onClose}>
-        <p className="muted">Es gibt noch kein Spiel, das man aktualisieren könnte.</p>
-      </Sheet>
+      <NewGameForm
+        onCancel={games.length && !startNew ? () => setCreating(false) : onClose}
+        onCreated={(ev) => {
+          setPending(ev);
+          setId(ev.id);
+          setCreating(false);
+        }}
+      />
     );
   // key: beim Wechsel des Spiels Entwurf neu laden
-  return <GameForm key={e.id} e={e} games={games} onPick={setId} onClose={onClose} />;
+  return <GameForm key={e.id} e={e} games={games} onPick={(v) => (v === NEW ? setCreating(true) : setId(v))} onClose={onClose} />;
+}
+
+const NEW = '__new';
+
+/** Ein Spiel nachtragen, das noch nicht in der App steht */
+function NewGameForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: (e: TeamEvent) => void }) {
+  const { club, saveEvent } = useStore();
+  const [date, setDate] = useState(todayISO());
+  const [time, setTime] = useState('15:00');
+  const [opponent, setOpponent] = useState('');
+  const [home, setHome] = useState<'home' | 'away'>('home');
+  const [type, setType] = useState<EventType>('match');
+  const [busy, setBusy] = useState(false);
+  const ok = opponent.trim() && date && date <= todayISO();
+  const create = async () => {
+    if (!ok) return;
+    setBusy(true);
+    const ev: TeamEvent = {
+      id: newId(),
+      title: `Spiel gegen ${opponent.trim()}`,
+      type,
+      date,
+      time,
+      location: home === 'home' ? club.defaultLocation || '' : '',
+      opponent: opponent.trim(),
+      home: home === 'home',
+      attendance: {},
+    };
+    await saveEvent(ev);
+    setBusy(false);
+    onCreated(ev);
+  };
+  return (
+    <Sheet
+      title="Spiel nachtragen"
+      onClose={onCancel}
+      footer={
+        <>
+          <button className="btn" onClick={onCancel}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={create} disabled={!ok || busy}>
+            Weiter zu Tore & Karten
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: 'grid', gap: 14 }}>
+        <p className="small muted" style={{ margin: 0 }}>
+          Für Spiele, die noch nicht unter Termine stehen. Danach trägst du Ergebnis, Tore und Karten ein.
+        </p>
+        <div className="field">
+          <span className="field-label">Wettbewerb</span>
+          <Segmented
+            label="Wettbewerb"
+            value={type}
+            onChange={setType}
+            options={[
+              { value: 'match', label: 'Punktspiel' },
+              { value: 'cup', label: 'Pokal' },
+              { value: 'testmatch', label: 'Testspiel' },
+            ]}
+          />
+        </div>
+        <Field label="Gegner">
+          <input value={opponent} onChange={(x) => setOpponent(x.target.value)} placeholder="z. B. LSG Lebien" autoFocus />
+        </Field>
+        <div className="field">
+          <span className="field-label">Heim oder auswärts</span>
+          <Segmented
+            label="Heim oder auswärts"
+            value={home}
+            onChange={setHome}
+            options={[
+              { value: 'home', label: 'Heimspiel' },
+              { value: 'away', label: 'Auswärts' },
+            ]}
+          />
+        </div>
+        <div className="cabin-pick">
+          <Field label="Datum" hint={date > todayISO() ? 'Nur vergangene Spiele – künftige legst du unter Termine an.' : undefined}>
+            <input type="date" value={date} max={todayISO()} onChange={(x) => setDate(x.target.value)} />
+          </Field>
+          <Field label="Anstoß">
+            <input type="time" value={time} onChange={(x) => setTime(x.target.value)} />
+          </Field>
+        </div>
+      </div>
+    </Sheet>
+  );
 }
 
 function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEvent[]; onPick: (id: string) => void; onClose: () => void }) {
@@ -76,18 +174,34 @@ function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEven
     }
     await saveEvent({ ...e, result, scorers });
 
-    // Liga-Tore auf die übernommene Saisonzahl (fussball.de / eigene Eingabe) aufrechnen
-    if (e.type === 'match') {
-      for (const p of players) {
-        const ext = p.ext;
-        if (!ext || e.date < seasonStartOf(ext.season)) continue;
+    const cardKey = `${seasonKey(currentSeasonStart(club.seasonStart, parseDate(e.date)))}|${e.type}`;
+    for (const p of players) {
+      let next: Player = p;
+      // Liga-Tore auf die übernommene Saisonzahl (fussball.de / eigene Eingabe) aufrechnen
+      const ext = p.ext;
+      if (e.type === 'match' && ext && e.date >= seasonStartOf(ext.season)) {
         const now = draft[p.id]?.goals || 0;
         const before = ext.added?.[e.id];
         // Spiele bis zum Stand der Übernahme sind dort schon enthalten
-        if (before === undefined && e.date <= ext.updatedAt) continue;
-        if ((before ?? 0) === now) continue;
-        await savePlayer({ ...p, ext: { ...ext, goals: Math.max(0, (ext.goals || 0) + now - (before ?? 0)), added: { ...(ext.added || {}), [e.id]: now } } });
+        const included = before === undefined && e.date <= ext.updatedAt;
+        if (!included && (before ?? 0) !== now)
+          next = { ...next, ext: { ...ext, goals: Math.max(0, (ext.goals || 0) + now - (before ?? 0)), added: { ...(ext.added || {}), [e.id]: now } } };
       }
+      // Karten: Wurde die Saisonzahl auf der Karten-Seite nach diesem Spiel eingetragen, ist das Spiel dort
+      // schon enthalten – dann den direkt eingetragenen Teil verringern, damit nichts doppelt zählt.
+      const setAt = p.cardsSetAt?.[cardKey];
+      const base = p.cards?.[cardKey];
+      if ((e.type === 'match' || e.type === 'cup') && setAt && base && e.date <= setAt) {
+        const old = e.scorers?.[p.id];
+        const r = draft[p.id] || EMPTY;
+        const nb = {
+          yellow: Math.max(0, base.yellow - (r.yellow - (old?.yellow || 0))),
+          yellowRed: Math.max(0, base.yellowRed - (r.yellowRed - (old?.yellowRed || 0))),
+          red: Math.max(0, base.red - (r.red - (old?.red || 0))),
+        };
+        if (nb.yellow !== base.yellow || nb.yellowRed !== base.yellowRed || nb.red !== base.red) next = { ...next, cards: { ...(p.cards || {}), [cardKey]: nb } };
+      }
+      if (next !== p) await savePlayer(next);
     }
     setSaving(false);
     toast(`${TYPE_LABEL[e.type]} ${eventTitle(e)} aktualisiert.`);
@@ -116,10 +230,11 @@ function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEven
       }
     >
       <div style={{ display: 'grid', gap: 14 }}>
-        {games.length > 1 && (
+        {games.length > 0 && (
           <Field label="Spiel">
             <select value={e.id} onChange={(x) => onPick(x.target.value)}>
-              {games.slice(0, 30).map((g) => (
+              <option value={NEW}>+ Anderes Spiel nachtragen …</option>
+              {games.slice(0, 40).map((g) => (
                 <option key={g.id} value={g.id}>
                   {formatDate(g.date)} · {TYPE_LABEL[g.type]} {eventTitle(g)}
                   {g.result ? ` (${g.result})` : ''}
@@ -173,6 +288,11 @@ function GameForm({ e, games, onPick, onClose }: { e: TeamEvent; games: TeamEven
           <button className="btn btn-ghost btn-sm" style={{ justifySelf: 'start' }} onClick={() => setShowAll(!showAll)}>
             {showAll ? 'Nur Spieler aus diesem Spiel' : 'Alle Spieler anzeigen'}
           </button>
+        )}
+        {e.type === 'match' && players.some((p) => p.ext && !p.ext.added?.[e.id] && e.date <= p.ext.updatedAt && e.date >= seasonStartOf(p.ext.season)) && (
+          <p className="small muted" style={{ margin: 0 }}>
+            Hinweis: Dieses Spiel ist im übernommenen fussball.de-Stand schon enthalten. Tore werden beim Spiel gespeichert, die Torschützenliste zählt sie aber nicht doppelt.
+          </p>
         )}
         <p className="small muted">
           {e.type === 'match'

@@ -27,6 +27,8 @@ export interface Player {
   inactive?: boolean;
   /** Direkt eingetragene Karten je Saison und Wettbewerb, Schlüssel z. B. "2026/27|match" */
   cards?: Record<string, CardCount>;
+  /** Wann die Kartenzahl einer Saison (Schlüssel wie bei cards) zuletzt direkt eingetragen wurde (YYYY-MM-DD) */
+  cardsSetAt?: Record<string, string>;
   /** Offizielle Saisonwerte, z. B. von fussball.de eingespielt */
   ext?: ExternalStats;
   // Altfelder der ersten Version (werden nicht mehr gepflegt, nur toleriert)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
 import { CardCount, Player } from '../types';
-import { currentSeasonStart, nextSeasonStart, seasonKey } from '../lib/dates';
+import { currentSeasonStart, nextSeasonStart, seasonKey, todayISO } from '../lib/dates';
 import { addCards, CardScope, cardTotals, matchCards } from '../lib/stats';
 import { Empty, PageHead, Segmented, useDialog } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -42,7 +42,7 @@ export function CardsView() {
     const cards = { ...(p.cards || {}) };
     if (!next.yellow && !next.yellowRed && !next.red) delete cards[key];
     else cards[key] = next;
-    savePlayer({ ...p, cards });
+    savePlayer({ ...p, cards, cardsSetAt: { ...(p.cardsSetAt || {}), [key]: todayISO() } });
   };
 
   return (

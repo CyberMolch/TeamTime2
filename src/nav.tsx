@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-export type Tab = 'home' | 'events' | 'team' | 'stats' | 'scorers' | 'cards' | 'cash' | 'jerseys' | 'settings';
+export type Tab = 'home' | 'events' | 'team' | 'stats' | 'results' | 'scorers' | 'cards' | 'cash' | 'jerseys' | 'settings';
 export interface Route {
   tab: Tab;
   eventId?: string;
@@ -22,6 +22,7 @@ export const TABS: { tab: Tab; label: string; icon: string; mobile?: boolean }[]
   { tab: 'team', label: 'Kader', icon: 'users', mobile: true },
   { tab: 'cash', label: 'Kasse', icon: 'wallet', mobile: true },
   { tab: 'stats', label: 'Auswertung', icon: 'chart' },
+  { tab: 'results', label: 'Ergebnisse', icon: 'list' },
   { tab: 'scorers', label: 'Torschützen', icon: 'trophy' },
   { tab: 'cards', label: 'Karten', icon: 'cards' },
   { tab: 'jerseys', label: 'Dienste', icon: 'shirt' },
