@@ -2612,3 +2612,7 @@ body {
 .lu-slot.dragging .lu-dot { transform: scale(1.12); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35); }
 .lu-save { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 1; min-width: 0; }
 .lu-save input { flex: 1; min-width: 160px; }
+/* Ersatzbank-Mehrfachauswahl */
+.bench-box { flex: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-strong); display: grid; place-items: center; background: var(--surface); color: #fff; }
+.bench-box.on { background: var(--green); border-color: var(--green); }
+.bench-pick:disabled { cursor: default; }

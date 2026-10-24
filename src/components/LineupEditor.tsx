@@ -146,15 +146,6 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
     persist(formation, s, toBench && pid ? [...bench.filter((x) => x !== pid), pid] : bench);
     setPick(null);
   };
-  const addBench = (pid: string) => {
-    haptic();
-    persist(
-      formation,
-      slots.map((x) => (x === pid ? '' : x)),
-      [...bench.filter((x) => x !== pid), pid],
-    );
-    setPick(null);
-  };
 
   // Freie Positionen mit Zusagen auffüllen – passende Position zuerst
   const autoFill = () => {
@@ -320,7 +311,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
         <div className="section-head" style={{ marginBottom: 0 }}>
           <h3>Ersatzbank</h3>
           <button className="btn btn-sm" onClick={() => setPick({ bench: true })}>
-            <Icon name="plus" size={16} /> Ersatzspieler
+            <Icon name="plus" size={16} /> Ersatzspieler wählen
           </button>
         </div>
         {bench.length ? (
@@ -345,9 +336,27 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
         </p>
       </div>
 
-      {pick && (
+      {pick && !('slot' in pick) && (
+        <BenchPicker
+          players={players}
+          status={st}
+          bench={bench}
+          onField={(id) => {
+            const i = slots.indexOf(id);
+            return i >= 0 ? def[i].label : '';
+          }}
+          onSave={(ids) => {
+            haptic();
+            persist(formation, slots, ids);
+            setPick(null);
+            toast(ids.length ? `${ids.length} Ersatzspieler auf der Bank.` : 'Bank geleert.');
+          }}
+          onClose={() => setPick(null)}
+        />
+      )}
+      {pick && 'slot' in pick && (
         <PlayerPicker
-          title={'slot' in pick ? `${def[pick.slot].label} besetzen` : 'Ersatzspieler wählen'}
+          title={`${def[pick.slot].label} besetzen`}
           players={players}
           status={st}
           where={(id) => {
@@ -356,10 +365,10 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
             if (bench.includes(id)) return 'Bank';
             return '';
           }}
-          current={'slot' in pick ? slots[pick.slot] : undefined}
-          onPick={(id) => ('slot' in pick ? place(pick.slot, id) : addBench(id))}
-          onClear={'slot' in pick && slots[pick.slot] ? () => clearSlot(pick.slot) : undefined}
-          onToBench={'slot' in pick && slots[pick.slot] ? () => clearSlot(pick.slot, true) : undefined}
+          current={slots[pick.slot]}
+          onPick={(id) => place(pick.slot, id)}
+          onClear={slots[pick.slot] ? () => clearSlot(pick.slot) : undefined}
+          onToBench={slots[pick.slot] ? () => clearSlot(pick.slot, true) : undefined}
           onClose={() => setPick(null)}
         />
       )}
@@ -431,6 +440,90 @@ function PlayerPicker({
                 </span>
               </span>
               {w && <span className="tag">{w}</span>}
+            </button>
+          );
+        })}
+      </div>
+    </Sheet>
+  );
+}
+
+/** Ersatzbank: mehrere Spieler auf einmal an- und abhaken */
+function BenchPicker({
+  players,
+  status,
+  bench,
+  onField,
+  onSave,
+  onClose,
+}: {
+  players: Player[];
+  status: (id: string) => AttendanceStatus;
+  bench: string[];
+  onField: (id: string) => string;
+  onSave: (ids: string[]) => void;
+  onClose: () => void;
+}) {
+  const [sel, setSel] = useState<string[]>(bench);
+  const sorted = [...players].sort((a, b) => ORDER.indexOf(status(a.id)) - ORDER.indexOf(status(b.id)) || a.name.localeCompare(b.name, 'de'));
+  const free = sorted.filter((p) => !onField(p.id));
+  const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const allPresent = free.filter((p) => status(p.id) === 'present').map((p) => p.id);
+  return (
+    <Sheet
+      title="Ersatzspieler wählen"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={() => onSave(sel)}>
+            <Icon name="check" size={18} /> Übernehmen ({sel.length})
+          </button>
+        </>
+      }
+    >
+      <div className="toolbar" style={{ marginTop: 0 }}>
+        {allPresent.length > 0 && (
+          <button className="btn btn-sm" onClick={() => setSel((s) => [...s, ...allPresent.filter((id) => !s.includes(id))])}>
+            Alle mit Zusage
+          </button>
+        )}
+        {sel.length > 0 && (
+          <button className="btn btn-sm btn-ghost" onClick={() => setSel([])}>
+            Keinen
+          </button>
+        )}
+        <span className="small muted" style={{ marginLeft: 'auto' }}>
+          {sel.length} ausgewählt
+        </span>
+      </div>
+      <div className="list">
+        {[...free, ...sorted.filter((p) => onField(p.id))].map((p) => {
+          const s = status(p.id);
+          const pos = onField(p.id);
+          const on = sel.includes(p.id);
+          const out = ['absent', 'injured', 'excused'].includes(s);
+          return (
+            <button
+              key={p.id}
+              className={'list-row bench-pick' + (on ? ' row-on' : '') + (out || pos ? ' row-dim' : '')}
+              disabled={!!pos}
+              onClick={() => toggle(p.id)}
+              role="checkbox"
+              aria-checked={on}
+            >
+              <span className={'bench-box' + (on ? ' on' : '')}>{on && <Icon name="check" size={14} stroke={3} />}</span>
+              <span className="lu-num">{p.jerseyNumber || ''}</span>
+              <span className="grow">
+                <span className="title">{p.name}</span>
+                <span className="sub" style={{ display: 'block' }}>
+                  <span className={`dot st-${s}`} /> {s === 'none' ? 'keine Rückmeldung' : STATUS_LABEL[s]}
+                  {p.position ? ` · ${p.position}` : ''}
+                </span>
+              </span>
+              {pos && <span className="tag">{pos}</span>}
             </button>
           );
         })}
