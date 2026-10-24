@@ -13,6 +13,8 @@ import { EventForm } from '../components/EventForm';
 import { AttendanceBar } from '../components/AttendanceBar';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
 import { GameUpdateSheet } from '../components/GameUpdate';
+import { LineupEditor, slotsOf } from '../components/LineupEditor';
+import { FORMATIONS } from '../lib/formations';
 import { exportCalendar } from '../lib/reminders';
 
 const QUICK: { st: AttendanceStatus; icon: string }[] = [
@@ -257,7 +259,7 @@ export function EventDetail({ id }: { id: string }) {
           </p>
         </>
       ) : (
-        <MatchTab e={e} roster={roster} />
+        <MatchTab e={e} />
       )}
 
       {editing && <EventForm event={e} onClose={() => setEditing(false)} />}
@@ -398,12 +400,11 @@ function AbsentFines({ e, players, onClose }: { e: TeamEvent; players: Player[];
   );
 }
 
-function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
+function MatchTab({ e }: { e: TeamEvent }) {
   const { club, players, events, saveEvent } = useStore();
   const parsed = parseResult(e.result);
   const [own, setOwn] = useState(parsed ? String(parsed[0]) : '');
   const [opp, setOpp] = useState(parsed ? String(parsed[1]) : '');
-  const [onlyAvailable, setOnlyAvailable] = useState(true);
   useEffect(() => {
     const p = parseResult(e.result);
     setOwn(p ? String(p[0]) : '');
@@ -417,16 +418,7 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
 
   const lineup = e.lineup || [];
   const bench = e.bench || [];
-  const cycle = (pid: string) => {
-    let l = lineup.filter((x) => x !== pid);
-    let b = bench.filter((x) => x !== pid);
-    if (lineup.includes(pid)) b = [...b, pid];
-    else if (!bench.includes(pid)) l = [...l, pid];
-    saveEvent({ ...e, lineup: l, bench: b });
-  };
-  const candidates = roster.filter(
-    (p) => !onlyAvailable || ['present', 'unsure'].includes(e.attendance[p.id] || '') || lineup.includes(p.id) || bench.includes(p.id),
-  );
+  const [lineupOpen, setLineupOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const goalsLogged = Object.values(e.scorers || {}).reduce((s, m) => s + (m.goals || 0), 0);
 
@@ -457,7 +449,7 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
         <div className="team">{homeFirst ? e.opponent : ownName}</div>
       </div>
 
-      <section>
+      <section style={isOver(e.date, e.time) ? undefined : { order: 1 }}>
         <div className="section-head">
           <h2>Tore & Karten</h2>
           {parsed && <span className="small muted">{goalsLogged} von {parsed[0]} Toren zugeordnet</span>}
@@ -491,43 +483,23 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
         <div className="section-head">
           <h2>Aufstellung</h2>
           <span className="small muted">
-            Startelf <b className="num">{lineup.length}</b> · Bank <b className="num">{bench.length}</b>
+            {lineup.length ? `${e.formation || '4-4-2'} · ${lineup.length}/11` : 'noch offen'}
+            {bench.length ? ` · Bank ${bench.length}` : ''}
           </span>
         </div>
-        <div className="toolbar">
-          <label className="check small">
-            <input type="checkbox" checked={onlyAvailable} onChange={(x) => setOnlyAvailable(x.target.checked)} />
-            Nur Spieler mit Zusage
-          </label>
-          {(lineup.length > 0 || bench.length > 0) && (
-            <button className="btn btn-sm btn-ghost" onClick={() => saveEvent({ ...e, lineup: [], bench: [] })}>
-              Zurücksetzen
-            </button>
+        <div className="panel panel-pad" style={{ display: 'grid', gap: 10 }}>
+          {lineup.length > 0 ? (
+            <LineupSummary e={e} players={players} />
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>
+              Formation wählen und die Positionen auf dem Spielfeld besetzen – mit den Zusagen oder aus dem letzten Spiel.
+            </p>
           )}
+          <button className="btn btn-sm btn-primary" style={{ justifySelf: 'start' }} onClick={() => setLineupOpen(true)}>
+            <Icon name="grid" size={16} /> {lineup.length ? 'Aufstellung bearbeiten' : 'Aufstellung eintragen'}
+          </button>
         </div>
-        {candidates.length === 0 ? (
-          <p className="muted small">Noch keine Zusagen. Erfasse zuerst, wer dabei ist, oder nimm den Haken oben raus.</p>
-        ) : (
-          <div className="pick-grid">
-            {candidates.map((p) => {
-              const inL = lineup.includes(p.id);
-              const inB = bench.includes(p.id);
-              return (
-                <button key={p.id} className={'pick' + (inL || inB ? ' on' : '')} onClick={() => cycle(p.id)}>
-                  <Avatar player={p} size={30} />
-                  <span className="grow ellipsis" title={p.position}>
-                    {p.name}
-                  </span>
-                  {inL && <span className="slot slot-start">Startelf</span>}
-                  {inB && <span className="slot slot-bench">Bank</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <p className="small muted" style={{ marginTop: 8 }}>
-          Tippen: Startelf → Bank → raus.
-        </p>
+        {lineupOpen && <LineupEditor e={e} onClose={() => setLineupOpen(false)} />}
       </section>
 
 
@@ -621,3 +593,26 @@ function MatchTab({ e, roster }: { e: TeamEvent; roster: Player[] }) {
   );
 }
 
+
+function LineupSummary({ e, players }: { e: TeamEvent; players: Player[] }) {
+  const { formation, slots } = slotsOf(e);
+  const def = FORMATIONS[formation];
+  const name = (id: string) => players.find((p) => p.id === id)?.name || '?';
+  const lines = (['TW', 'Abwehr', 'Mittelfeld', 'Sturm'] as const)
+    .map((l) => ({ l, ids: def.map((s, i) => (s.line === l ? slots[i] : '')).filter(Boolean) }))
+    .filter((x) => x.ids.length);
+  return (
+    <div className="lg-facts small" style={{ margin: 0 }}>
+      {lines.map(({ l, ids }) => (
+        <span key={l}>
+          <b>{l === 'TW' ? 'Tor' : l}:</b> {ids.map(name).join(', ')}
+        </span>
+      ))}
+      {!!e.bench?.length && (
+        <span>
+          <b>Bank:</b> {e.bench.map(name).join(', ')}
+        </span>
+      )}
+    </div>
+  );
+}

@@ -13,6 +13,7 @@ import { AttendanceBar } from '../components/AttendanceBar';
 import { EventRow } from '../components/EventRow';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
 import { GameUpdateSheet, LastGameCard } from '../components/GameUpdate';
+import { LineupEditor } from '../components/LineupEditor';
 
 export function Dashboard() {
   const { players, events, club } = useStore();
@@ -235,6 +236,7 @@ function Kickoff({ e, onShare }: { e: TeamEvent; onShare: () => void }) {
   const c = countStatus(e, players);
   const match = isMatch(e.type) && !!e.opponent;
   const open = () => go({ tab: 'events', eventId: e.id });
+  const [lineup, setLineup] = useState(false);
   const own = club.teamName || club.clubName;
   const oppInitials = (e.opponent || '')
     .replace(/^(SV|FC|SG|TSV|VfB|VfL|SC|FSV|BSG|TuS|SpVgg|1\.)\s+/i, '')
@@ -297,11 +299,18 @@ function Kickoff({ e, onShare }: { e: TeamEvent; onShare: () => void }) {
         <button className="btn btn-primary" onClick={open}>
           Zusagen erfassen
         </button>
+        {isMatch(e.type) && (
+          <button className="btn btn-soft" onClick={() => setLineup(true)}>
+            <Icon name="grid" size={18} />
+            Aufstellung{e.lineup?.length ? ` ${e.lineup.length}/11` : ''}
+          </button>
+        )}
         <button className="btn btn-soft" onClick={onShare}>
           <Icon name="share" size={18} />
           Teilen
         </button>
       </div>
+      {lineup && <LineupEditor e={e} onClose={() => setLineup(false)} />}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { JerseysView } from './views/Jerseys';
 import { CardsView } from './views/Cards';
 import { ScorersView } from './views/Scorers';
 import { ResultsView } from './views/Results';
+import { LineupsView } from './views/Lineups';
 import { SettingsView } from './views/Settings';
 
 function useTheme(theme?: string) {
@@ -126,6 +127,8 @@ export function App() {
         return <StatsView />;
       case 'cash':
         return <CashView />;
+      case 'lineup':
+        return <LineupsView />;
       case 'results':
         return <ResultsView />;
       case 'scorers':

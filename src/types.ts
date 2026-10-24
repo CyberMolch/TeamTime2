@@ -90,6 +90,10 @@ export interface TeamEvent {
   notes?: string;
   attendance: Record<string, AttendanceStatus>;
   lineup?: string[];
+  /** Formation, z. B. "4-4-2" */
+  formation?: string;
+  /** Spieler-ID je Position der Formation ('' = frei); lineup = slots ohne Lücken */
+  slots?: string[];
   bench?: string[];
   scorers?: Record<string, MatchStat>;
   jerseyDuty?: JerseyDuty;
