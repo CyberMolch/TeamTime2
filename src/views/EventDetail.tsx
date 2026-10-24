@@ -14,7 +14,6 @@ import { AttendanceBar } from '../components/AttendanceBar';
 import { nextCabinPair, nextJerseyCandidate } from './Jerseys';
 import { GameUpdateSheet } from '../components/GameUpdate';
 import { LineupEditor, slotsOf } from '../components/LineupEditor';
-import { FORMATIONS } from '../lib/formations';
 import { exportCalendar } from '../lib/reminders';
 
 const QUICK: { st: AttendanceStatus; icon: string }[] = [
@@ -595,8 +594,8 @@ function MatchTab({ e }: { e: TeamEvent }) {
 
 
 function LineupSummary({ e, players }: { e: TeamEvent; players: Player[] }) {
-  const { formation, slots } = slotsOf(e);
-  const def = FORMATIONS[formation];
+  const { club } = useStore();
+  const { slots, def } = slotsOf(e, club.customFormations);
   const name = (id: string) => players.find((p) => p.id === id)?.name || '?';
   const lines = (['TW', 'Abwehr', 'Mittelfeld', 'Sturm'] as const)
     .map((l) => ({ l, ids: def.map((s, i) => (s.line === l ? slots[i] : '')).filter(Boolean) }))

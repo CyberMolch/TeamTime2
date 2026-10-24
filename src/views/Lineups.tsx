@@ -25,7 +25,7 @@ export function LineupsView() {
   const open = events.find((e) => e.id === openId);
 
   const row = (e: TeamEvent, next = false) => {
-    const { slots } = slotsOf(e);
+    const { slots, moved } = slotsOf(e, club.customFormations);
     const n = slots.filter(Boolean).length;
     const md = matchday.get(e.id);
     return (
@@ -41,7 +41,7 @@ export function LineupsView() {
               {eventTitle(e)}
             </span>
             <span className="sub" style={{ display: 'block' }}>
-              {n ? `${e.formation || '4-4-2'} · ${n}/11${e.bench?.length ? ` · Bank ${e.bench.length}` : ''}` : 'Noch keine Aufstellung'}
+              {n ? `${e.formation || '4-4-2'}${moved ? ' (angepasst)' : ''} · ${n}/11${e.bench?.length ? ` · Bank ${e.bench.length}` : ''}` : 'Noch keine Aufstellung'}
             </span>
           </span>
           <span className="res-side">

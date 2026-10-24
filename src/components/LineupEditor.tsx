@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { type PointerEvent, useMemo, useRef, useState } from 'react';
 import { useStore } from '../data/store';
 import { AttendanceStatus, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
-import { DEFAULT_FORMATION, FORMATIONS, FORMATION_NAMES, Line } from '../lib/formations';
+import { DEFAULT_FORMATION, FORMATIONS, Line, Pt, allFormations, slotsFor } from '../lib/formations';
 import { formatDate } from '../lib/dates';
 import { eventTitle } from '../lib/texts';
 import { haptic, shareText } from '../lib/native';
@@ -15,18 +15,17 @@ const POS_LINE: Record<string, Line> = { Tor: 'TW', Abwehr: 'Abwehr', Mittelfeld
 const ORDER: AttendanceStatus[] = ['present', 'unsure', 'none', 'excused', 'absent', 'injured'];
 
 /** Slots aus gespeicherten Daten (auch für alte Aufstellungen ohne Positionen) */
-export function slotsOf(e: TeamEvent): { formation: string; slots: string[] } {
-  const formation = e.formation && FORMATIONS[e.formation] ? e.formation : DEFAULT_FORMATION;
-  const n = FORMATIONS[formation].length;
+export function slotsOf(e: TeamEvent, custom?: Record<string, Pt[]>) {
+  const formation = e.formation && (FORMATIONS[e.formation] || custom?.[e.formation]) ? e.formation : e.formation && !custom ? e.formation : DEFAULT_FORMATION;
+  const def = slotsFor(formation, custom, e.positions);
   const base = e.slots?.length ? e.slots : e.lineup || [];
-  return { formation, slots: Array.from({ length: n }, (_, i) => base[i] || '') };
+  return { formation, slots: Array.from({ length: def.length }, (_, i) => base[i] || ''), def, moved: !!e.positions?.length };
 }
 
-export function lineupText(e: TeamEvent, players: Player[], clubName?: string): string {
-  const { formation, slots } = slotsOf(e);
+export function lineupText(e: TeamEvent, players: Player[], clubName?: string, custom?: Record<string, Pt[]>): string {
+  const { formation, slots, def, moved } = slotsOf(e, custom);
   const name = (id: string) => players.find((p) => p.id === id)?.name || '?';
-  const def = FORMATIONS[formation];
-  const lines: string[] = [`⚽ *Aufstellung ${TYPE_LABEL[e.type]} ${eventTitle(e)}*`, `${formatDate(e.date)}${e.time ? `, ${e.time} Uhr` : ''}${e.meetTime ? ` · Treffpunkt ${e.meetTime} Uhr` : ''}`, `System: ${formation}`, ''];
+  const lines: string[] = [`⚽ *Aufstellung ${TYPE_LABEL[e.type]} ${eventTitle(e)}*`, `${formatDate(e.date)}${e.time ? `, ${e.time} Uhr` : ''}${e.meetTime ? ` · Treffpunkt ${e.meetTime} Uhr` : ''}`, `System: ${formation}${moved ? ' (angepasst)' : ''}`, ''];
   for (const line of ['TW', 'Abwehr', 'Mittelfeld', 'Sturm'] as Line[]) {
     const ids = def.map((s, i) => (s.line === line ? slots[i] : '')).filter(Boolean);
     if (ids.length) lines.push(`*${line === 'TW' ? 'Tor' : line}:* ${ids.map(name).join(', ')}`);
@@ -37,28 +36,98 @@ export function lineupText(e: TeamEvent, players: Player[], clubName?: string): 
 }
 
 export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void }) {
-  const { players, events, club, saveEvent } = useStore();
+  const { players, events, club, saveEvent, saveClub } = useStore();
   const { toast } = useDialog();
-  const init = slotsOf(e);
+  const custom = club.customFormations;
+  const init = slotsOf(e, custom);
   const [formation, setFormation] = useState(init.formation);
   const [slots, setSlots] = useState<string[]>(init.slots);
   const [bench, setBench] = useState<string[]>(e.bench || []);
+  const [positions, setPositions] = useState<Pt[] | undefined>(e.positions?.length ? e.positions : undefined);
   const [pick, setPick] = useState<{ slot: number } | { bench: true } | null>(null);
-  const def = FORMATIONS[formation];
+  const [naming, setNaming] = useState<string | null>(null);
+  const def = slotsFor(formation, custom, positions);
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const st = (id: string): AttendanceStatus => e.attendance?.[id] || 'none';
   const clubName = club.teamName ? `${club.clubName} ${club.teamName}` : club.clubName;
 
-  const persist = (f: string, s: string[], b: string[]) => {
+  // pos: undefined = unverändert lassen, null = eigene Positionen entfernen
+  const persist = (f: string, s: string[], b: string[], pos: Pt[] | null | undefined = positions) => {
+    const p = pos || undefined;
     setFormation(f);
     setSlots(s);
     setBench(b);
-    saveEvent({ ...e, formation: f, slots: s, lineup: s.filter(Boolean), bench: b });
+    setPositions(p);
+    const next: TeamEvent = { ...e, formation: f, slots: s, lineup: s.filter(Boolean), bench: b, positions: p };
+    if (!p) delete next.positions;
+    saveEvent(next);
   };
 
-  const changeFormation = (f: string) => {
-    const n = FORMATIONS[f].length;
-    persist(f, Array.from({ length: n }, (_, i) => slots[i] || ''), bench);
+  const changeFormation = (f: string) => persist(f, Array.from({ length: 11 }, (_, i) => slots[i] || ''), bench, null);
+
+  // ---- Ziehen & Ablegen auf dem Spielfeld ----
+  const pitchRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ i: number; x0: number; y0: number; moved: boolean } | null>(null);
+  const [dragPos, setDragPos] = useState<{ i: number; x: number; y: number } | null>(null);
+  const toPct = (cx: number, cy: number) => {
+    const r = pitchRef.current!.getBoundingClientRect();
+    const clamp = (v: number) => Math.round(Math.min(95, Math.max(5, v)) * 10) / 10;
+    return { x: clamp(((cx - r.left) / r.width) * 100), y: clamp(((cy - r.top) / r.height) * 100) };
+  };
+  const onDown = (i: number, ev: PointerEvent<HTMLButtonElement>) => {
+    if (ev.button !== 0) return;
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    drag.current = { i, x0: ev.clientX, y0: ev.clientY, moved: false };
+  };
+  const onMove = (ev: PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    if (!d.moved && Math.hypot(ev.clientX - d.x0, ev.clientY - d.y0) < 6) return;
+    d.moved = true;
+    setDragPos({ i: d.i, ...toPct(ev.clientX, ev.clientY) });
+  };
+  const onUp = (ev: PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (!d.moved) {
+      setPick({ slot: d.i });
+      return;
+    }
+    const p = toPct(ev.clientX, ev.clientY);
+    setDragPos(null);
+    haptic();
+    // Auf einen anderen Spieler gezogen → Plätze tauschen, sonst Position verschieben
+    const target = def.findIndex((s, j) => j !== d.i && Math.abs(s.x - p.x) < 7 && Math.abs(s.y - p.y) < 5.5);
+    if (target >= 0) {
+      const s = [...slots];
+      [s[d.i], s[target]] = [s[target], s[d.i]];
+      persist(formation, s, bench);
+      return;
+    }
+    const pos = def.map((s) => ({ x: s.x, y: s.y }));
+    pos[d.i] = p;
+    persist(formation, slots, bench, pos);
+  };
+
+  const saveSystem = async () => {
+    const name = (naming || '').trim();
+    if (!name) return;
+    const pts = def.map((s) => ({ x: s.x, y: s.y }));
+    await saveClub({ customFormations: { ...(custom || {}), [name]: pts } });
+    persist(name, slots, bench, null);
+    setNaming(null);
+    toast(`System „${name}“ gespeichert – steht jetzt in der Auswahl.`);
+  };
+  const deleteSystem = async () => {
+    if (!custom?.[formation]) return;
+    const rest = { ...custom };
+    const pts = rest[formation];
+    delete rest[formation];
+    await saveClub({ customFormations: rest });
+    // Positionen dieses Spiels behalten, Grundsystem 4-4-2
+    persist(DEFAULT_FORMATION, slots, bench, pts);
+    toast('System gelöscht.');
   };
 
   const place = (slot: number, pid: string) => {
@@ -120,16 +189,16 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
   );
   const copyPrev = () => {
     if (!prev) return;
-    const p = slotsOf(prev);
+    const p = slotsOf(prev, custom);
     const ok = (id: string) => byId.has(id) && !['absent', 'injured', 'excused'].includes(st(id));
     const s = p.slots.map((id) => (id && ok(id) ? id : ''));
     const missing = p.slots.filter((id) => id && !ok(id)).length;
-    persist(p.formation, s, (prev.bench || []).filter((id) => ok(id) && !s.includes(id)));
+    persist(p.formation, s, (prev.bench || []).filter((id) => ok(id) && !s.includes(id)), prev.positions?.length ? prev.positions : null);
     toast(`Aufstellung vom ${formatDate(prev.date)} übernommen${missing ? ` – ${missing} Position${missing === 1 ? '' : 'en'} frei (Absage/verletzt)` : ''}.`);
   };
 
   const share = async () => {
-    const r = await shareText('Aufstellung', lineupText({ ...e, formation, slots, bench }, players, clubName));
+    const r = await shareText('Aufstellung', lineupText({ ...e, formation, slots, bench, positions }, players, clubName, custom));
     if (r === 'copied') toast('Aufstellung kopiert – jetzt in WhatsApp einfügen.');
   };
 
@@ -160,13 +229,14 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           <label className="lu-formation">
             <span className="small muted">System</span>
             <select value={formation} onChange={(x) => changeFormation(x.target.value)}>
-              {FORMATION_NAMES.map((f) => (
+              {allFormations(custom).map((f) => (
                 <option key={f} value={f}>
                   {f}
                 </option>
               ))}
             </select>
           </label>
+          {positions && <span className="tag">angepasst</span>}
           <span className="small muted" style={{ marginLeft: 'auto' }}>
             <b className="num">{filled}</b>/11 · Bank <b className="num">{bench.length}</b>
           </span>
@@ -187,7 +257,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           )}
         </div>
 
-        <div className="pitch" role="group" aria-label={`Spielfeld, System ${formation}`}>
+        <div className="pitch" ref={pitchRef} role="group" aria-label={`Spielfeld, System ${formation}`}>
           <span className="pitch-line pitch-half" />
           <span className="pitch-line pitch-circle" />
           <span className="pitch-line pitch-box pitch-box-top" />
@@ -196,13 +266,55 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           {def.map((s, i) => {
             const p = byId.get(slots[i]);
             const status = p ? st(p.id) : 'none';
+            const dp = dragPos?.i === i ? dragPos : null;
             return (
-              <button key={i} className={'lu-slot' + (p ? ' on' : '') + (p && ['absent', 'injured', 'excused'].includes(status) ? ' warn' : '')} style={{ left: `${s.x}%`, top: `${s.y}%` }} onClick={() => setPick({ slot: i })} aria-label={`${s.label}: ${p ? p.name : 'frei'}`}>
+              <button
+                key={i}
+                className={'lu-slot' + (p ? ' on' : '') + (p && ['absent', 'injured', 'excused'].includes(status) ? ' warn' : '') + (dp ? ' dragging' : '')}
+                style={{ left: `${dp ? dp.x : s.x}%`, top: `${dp ? dp.y : s.y}%` }}
+                onPointerDown={(ev) => onDown(i, ev)}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={() => {
+                  drag.current = null;
+                  setDragPos(null);
+                }}
+                onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), setPick({ slot: i }))}
+                aria-label={`${s.label}: ${p ? p.name : 'frei'}`}
+              >
                 <span className="lu-dot">{p ? p.jerseyNumber || initials(p.name) : <Icon name="plus" size={16} stroke={2.4} />}</span>
                 <span className="lu-name">{p ? short(p) : s.label}</span>
               </button>
             );
           })}
+        </div>
+
+        <div className="lu-toolbar">
+          {positions && (
+            <button className="btn btn-sm btn-ghost" onClick={() => persist(formation, slots, bench, null)}>
+              <Icon name="repeat" size={16} /> Positionen zurücksetzen
+            </button>
+          )}
+          {naming === null ? (
+            <button className="btn btn-sm" onClick={() => setNaming(positions ? '' : custom?.[formation] ? formation : '')}>
+              <Icon name="download" size={16} /> Als eigenes System speichern
+            </button>
+          ) : (
+            <span className="lu-save">
+              <input autoFocus value={naming} onChange={(x) => setNaming(x.target.value)} onKeyDown={(x) => x.key === 'Enter' && saveSystem()} placeholder="Name, z. B. 4-1-3-2 Raute" maxLength={30} />
+              <button className="btn btn-sm btn-primary" onClick={saveSystem} disabled={!naming.trim()}>
+                Speichern
+              </button>
+              <button className="btn btn-sm btn-ghost" onClick={() => setNaming(null)}>
+                Abbrechen
+              </button>
+            </span>
+          )}
+          {custom?.[formation] && !positions && naming === null && (
+            <button className="btn btn-sm btn-ghost" onClick={deleteSystem}>
+              <Icon name="trash" size={16} /> System löschen
+            </button>
+          )}
         </div>
 
         <div className="section-head" style={{ marginBottom: 0 }}>
@@ -229,7 +341,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           </p>
         )}
         <p className="small muted" style={{ margin: 0 }}>
-          Position antippen und Spieler wählen. Ein Spieler, der schon woanders steht, tauscht den Platz. Wird automatisch gespeichert.
+          Position antippen und Spieler wählen. Spieler mit Maus oder Finger an eine beliebige Stelle ziehen – auf einen anderen Spieler gezogen, tauschen beide. Wird automatisch gespeichert.
         </p>
       </div>
 

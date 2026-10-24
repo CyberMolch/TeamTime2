@@ -29,3 +29,32 @@ export const FORMATIONS: Record<string, Slot[]> = {
 };
 export const FORMATION_NAMES = Object.keys(FORMATIONS);
 export const DEFAULT_FORMATION = '4-4-2';
+
+export type Pt = { x: number; y: number };
+
+/** Bezeichnung aus der Lage auf dem Feld (für verschobene Spieler und eigene Systeme) */
+export function slotAt(x: number, y: number): Omit<Slot, 'x' | 'y'> {
+  const side = x < 30 ? 'L' : x > 70 ? 'R' : '';
+  if (y >= 80) return { label: 'TW', line: 'TW' };
+  if (y >= 60) return { label: side ? `${side}V` : 'IV', line: 'Abwehr' };
+  if (y >= 50) return { label: side ? `${side}M` : 'DM', line: 'Mittelfeld' };
+  if (y >= 37) return { label: side ? `${side}M` : 'ZM', line: 'Mittelfeld' };
+  if (y >= 27) return { label: side ? `${side}A` : 'ZOM', line: side ? 'Sturm' : 'Mittelfeld' };
+  return { label: side ? `${side}A` : 'ST', line: 'Sturm' };
+}
+
+/** Alle wählbaren Systeme: eingebaute + eigene des Vereins */
+export function allFormations(custom?: Record<string, Pt[]>): string[] {
+  return [...FORMATION_NAMES, ...Object.keys(custom || {})];
+}
+
+/** Positionen eines Systems, ggf. mit verschobenen Positionen dieses Spiels */
+export function slotsFor(formation: string, custom?: Record<string, Pt[]>, positions?: Pt[]): Slot[] {
+  const base: Slot[] = FORMATIONS[formation] || (custom?.[formation] ? custom[formation].map((p) => ({ ...p, ...slotAt(p.x, p.y) })) : FORMATIONS[DEFAULT_FORMATION]);
+  if (!positions?.length) return base;
+  return base.map((s, i) => {
+    const p = positions[i];
+    if (!p || (p.x === s.x && p.y === s.y)) return s;
+    return { x: p.x, y: p.y, ...slotAt(p.x, p.y) };
+  });
+}

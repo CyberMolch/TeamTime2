@@ -94,6 +94,8 @@ export interface TeamEvent {
   formation?: string;
   /** Spieler-ID je Position der Formation ('' = frei); lineup = slots ohne Lücken */
   slots?: string[];
+  /** Eigene Positionen je Slot (verschoben), x/y in Prozent */
+  positions?: { x: number; y: number }[];
   bench?: string[];
   scorers?: Record<string, MatchStat>;
   jerseyDuty?: JerseyDuty;
@@ -148,6 +150,8 @@ export interface ClubSettings {
   jerseyRotation?: string[]; // Reihenfolge der Spieler-IDs
   // Kabinenreinigung
   cabinRotation?: string[];
+  // Eigene Spielsysteme: Name → 11 Positionen (x/y in Prozent)
+  customFormations?: Record<string, { x: number; y: number }[]>;
 }
 
 export interface FeeSettings {

@@ -201,7 +201,8 @@ export function createCloudBackend(user: User): Backend {
       }
     },
     async saveClub(patch) {
-      setDoc(clubRef, patch, { merge: true }).catch(console.error);
+      // mergeFields: geänderte Felder komplett ersetzen (sonst bleiben gelöschte Einträge in Maps erhalten)
+      setDoc(clubRef, patch, { mergeFields: Object.keys(patch) }).catch(console.error);
     },
     async replaceAll(d) {
       // Import einer Sicherung: vorhandene Einträge mit gleicher ID werden überschrieben,
