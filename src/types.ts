@@ -96,6 +96,8 @@ export interface TeamEvent {
   slots?: string[];
   /** Eigene Positionen je Slot (verschoben), x/y in Prozent */
   positions?: { x: number; y: number }[];
+  /** Abweichende Rückennummern nur für dieses Spiel (Spieler-ID → Nummer) */
+  numbers?: Record<string, string>;
   bench?: string[];
   scorers?: Record<string, MatchStat>;
   jerseyDuty?: JerseyDuty;

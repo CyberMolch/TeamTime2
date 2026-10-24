@@ -24,7 +24,11 @@ export function slotsOf(e: TeamEvent, custom?: Record<string, Pt[]>) {
 
 export function lineupText(e: TeamEvent, players: Player[], clubName?: string, custom?: Record<string, Pt[]>): string {
   const { formation, slots, def, moved } = slotsOf(e, custom);
-  const name = (id: string) => players.find((p) => p.id === id)?.name || '?';
+  const name = (id: string) => {
+    const p = players.find((x) => x.id === id);
+    const n = e.numbers?.[id] ?? p?.jerseyNumber;
+    return `${n ? `${n} ` : ''}${p?.name || '?'}`;
+  };
   const lines: string[] = [`⚽ *Aufstellung ${TYPE_LABEL[e.type]} ${eventTitle(e)}*`, `${formatDate(e.date)}${e.time ? `, ${e.time} Uhr` : ''}${e.meetTime ? ` · Treffpunkt ${e.meetTime} Uhr` : ''}`, `System: ${formation}${moved ? ' (angepasst)' : ''}`, ''];
   for (const line of ['TW', 'Abwehr', 'Mittelfeld', 'Sturm'] as Line[]) {
     const ids = def.map((s, i) => (s.line === line ? slots[i] : '')).filter(Boolean);
@@ -46,6 +50,17 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
   const [positions, setPositions] = useState<Pt[] | undefined>(e.positions?.length ? e.positions : undefined);
   const [pick, setPick] = useState<{ slot: number } | { bench: true } | null>(null);
   const [naming, setNaming] = useState<string | null>(null);
+  const [numbers, setNumbers] = useState<Record<string, string>>(e.numbers || {});
+  const [numOpen, setNumOpen] = useState(false);
+  /** Rückennummer an diesem Spieltag (abweichend oder Stammnummer) */
+  const num = (p?: Player) => (p ? (numbers[p.id] ?? p.jerseyNumber ?? '') : '');
+  const saveNumbers = (nums: Record<string, string>) => {
+    setNumbers(nums);
+    const next: TeamEvent = { ...e, formation, slots, lineup: slots.filter(Boolean), bench, positions, numbers: nums };
+    if (!positions) delete next.positions;
+    if (!Object.keys(nums).length) delete next.numbers;
+    saveEvent(next);
+  };
   const def = slotsFor(formation, custom, positions);
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const st = (id: string): AttendanceStatus => e.attendance?.[id] || 'none';
@@ -58,7 +73,8 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
     setSlots(s);
     setBench(b);
     setPositions(p);
-    const next: TeamEvent = { ...e, formation: f, slots: s, lineup: s.filter(Boolean), bench: b, positions: p };
+    const next: TeamEvent = { ...e, formation: f, slots: s, lineup: s.filter(Boolean), bench: b, positions: p, numbers };
+    if (!Object.keys(numbers).length) delete next.numbers;
     if (!p) delete next.positions;
     saveEvent(next);
   };
@@ -189,7 +205,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
   };
 
   const share = async () => {
-    const r = await shareText('Aufstellung', lineupText({ ...e, formation, slots, bench, positions }, players, clubName, custom));
+    const r = await shareText('Aufstellung', lineupText({ ...e, formation, slots, bench, positions, numbers }, players, clubName, custom));
     if (r === 'copied') toast('Aufstellung kopiert – jetzt in WhatsApp einfügen.');
   };
 
@@ -236,6 +252,11 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           <button className="btn btn-sm" onClick={autoFill} disabled={filled === def.length}>
             <Icon name="users" size={16} /> Mit Zusagen auffüllen
           </button>
+          {(filled > 0 || bench.length > 0) && (
+            <button className="btn btn-sm" onClick={() => setNumOpen(true)}>
+              <b className="num" style={{ fontSize: '0.8rem' }}>#</b> Rückennummern
+            </button>
+          )}
           {prev && (
             <button className="btn btn-sm" onClick={copyPrev}>
               <Icon name="copy" size={16} /> Vom {formatDate(prev.date).split(', ')[1]} übernehmen
@@ -273,7 +294,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
                 onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), setPick({ slot: i }))}
                 aria-label={`${s.label}: ${p ? p.name : 'frei'}`}
               >
-                <span className="lu-dot">{p ? p.jerseyNumber || initials(p.name) : <Icon name="plus" size={16} stroke={2.4} />}</span>
+                <span className={'lu-dot' + (p && numbers[p.id] !== undefined ? ' custom-num' : '')}>{p ? num(p) || initials(p.name) : <Icon name="plus" size={16} stroke={2.4} />}</span>
                 <span className="lu-name">{p ? short(p) : s.label}</span>
               </button>
             );
@@ -318,7 +339,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
           <div className="chips">
             {bench.map((id) => (
               <span key={id} className="chip on lu-bench">
-                {byId.get(id)?.jerseyNumber && <b className="num">{byId.get(id)!.jerseyNumber}</b>}
+                {num(byId.get(id)) && <b className="num">{num(byId.get(id))}</b>}
                 {byId.get(id)?.name || 'Unbekannt'}
                 <button aria-label="Von der Bank nehmen" onClick={() => persist(formation, slots, bench.filter((x) => x !== id))}>
                   <Icon name="x" size={14} />
@@ -345,6 +366,7 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
             const i = slots.indexOf(id);
             return i >= 0 ? def[i].label : '';
           }}
+          num={num}
           onSave={(ids) => {
             haptic();
             persist(formation, slots, ids);
@@ -352,6 +374,23 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
             toast(ids.length ? `${ids.length} Ersatzspieler auf der Bank.` : 'Bank geleert.');
           }}
           onClose={() => setPick(null)}
+        />
+      )}
+      {numOpen && (
+        <NumbersSheet
+          ids={[...slots.filter(Boolean), ...bench]}
+          label={(id) => {
+            const i = slots.indexOf(id);
+            return i >= 0 ? def[i].label : 'Bank';
+          }}
+          players={byId}
+          numbers={numbers}
+          onSave={(n) => {
+            saveNumbers(n);
+            setNumOpen(false);
+            toast('Rückennummern für dieses Spiel gespeichert.');
+          }}
+          onClose={() => setNumOpen(false)}
         />
       )}
       {pick && 'slot' in pick && (
@@ -366,6 +405,15 @@ export function LineupEditor({ e, onClose }: { e: TeamEvent; onClose: () => void
             return '';
           }}
           current={slots[pick.slot]}
+          num={num}
+          onNumbers={
+            slots[pick.slot]
+              ? () => {
+                  setPick(null);
+                  setNumOpen(true);
+                }
+              : undefined
+          }
           onPick={(id) => place(pick.slot, id)}
           onClear={slots[pick.slot] ? () => clearSlot(pick.slot) : undefined}
           onToBench={slots[pick.slot] ? () => clearSlot(pick.slot, true) : undefined}
@@ -392,12 +440,16 @@ function PlayerPicker({
   status,
   where,
   current,
+  num,
+  onNumbers,
   onPick,
   onClear,
   onToBench,
   onClose,
 }: {
   title: string;
+  num: (p?: Player) => string;
+  onNumbers?: () => void;
   players: Player[];
   status: (id: string) => AttendanceStatus;
   where: (id: string) => string;
@@ -422,6 +474,11 @@ function PlayerPicker({
               Position leeren
             </button>
           )}
+          {onNumbers && (
+            <button className="btn btn-sm btn-ghost" onClick={onNumbers}>
+              # Nummer ändern
+            </button>
+          )}
         </div>
       )}
       <div className="list">
@@ -431,7 +488,7 @@ function PlayerPicker({
           const out = ['absent', 'injured', 'excused'].includes(s);
           return (
             <button key={p.id} className={'list-row' + (p.id === current ? ' row-on' : '') + (out ? ' row-dim' : '')} onClick={() => onPick(p.id)}>
-              <span className="lu-num">{p.jerseyNumber || ''}</span>
+              <span className="lu-num">{num(p)}</span>
               <span className="grow">
                 <span className="title">{p.name}</span>
                 <span className="sub" style={{ display: 'block' }}>
@@ -454,12 +511,14 @@ function BenchPicker({
   status,
   bench,
   onField,
+  num,
   onSave,
   onClose,
 }: {
   players: Player[];
   status: (id: string) => AttendanceStatus;
   bench: string[];
+  num: (p?: Player) => string;
   onField: (id: string) => string;
   onSave: (ids: string[]) => void;
   onClose: () => void;
@@ -515,7 +574,7 @@ function BenchPicker({
               aria-checked={on}
             >
               <span className={'bench-box' + (on ? ' on' : '')}>{on && <Icon name="check" size={14} stroke={3} />}</span>
-              <span className="lu-num">{p.jerseyNumber || ''}</span>
+              <span className="lu-num">{num(p)}</span>
               <span className="grow">
                 <span className="title">{p.name}</span>
                 <span className="sub" style={{ display: 'block' }}>
@@ -525,6 +584,98 @@ function BenchPicker({
               </span>
               {pos && <span className="tag">{pos}</span>}
             </button>
+          );
+        })}
+      </div>
+    </Sheet>
+  );
+}
+
+/** Rückennummern nur für dieses Spiel ändern – die Stammnummer im Kader bleibt */
+function NumbersSheet({
+  ids,
+  label,
+  players,
+  numbers,
+  onSave,
+  onClose,
+}: {
+  ids: string[];
+  label: (id: string) => string;
+  players: Map<string, Player>;
+  numbers: Record<string, string>;
+  onSave: (n: Record<string, string>) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>(() => Object.fromEntries(ids.map((id) => [id, numbers[id] ?? players.get(id)?.jerseyNumber ?? ''])));
+  const counts = Object.values(draft).reduce<Record<string, number>>((m, n) => (n ? { ...m, [n]: (m[n] || 0) + 1 } : m), {});
+  const dupes = Object.keys(counts).filter((n) => counts[n] > 1);
+  const save = () => {
+    // Nur Abweichungen von der Stammnummer speichern
+    const out: Record<string, string> = {};
+    for (const [id, n] of Object.entries(numbers)) if (!ids.includes(id)) out[id] = n;
+    for (const id of ids) {
+      const n = (draft[id] || '').trim();
+      if (n !== (players.get(id)?.jerseyNumber || '')) out[id] = n;
+    }
+    onSave(out);
+  };
+  return (
+    <Sheet
+      title="Rückennummern für dieses Spiel"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            Abbrechen
+          </button>
+          <button className="btn btn-primary" onClick={save}>
+            <Icon name="check" size={18} /> Speichern
+          </button>
+        </>
+      }
+    >
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Gilt nur für dieses Spiel. Die Stammnummer im Kader bleibt unverändert.
+      </p>
+      {dupes.length > 0 && (
+        <div className="banner banner-warn" style={{ marginBottom: 10 }}>
+          <Icon name="alert" />
+          Nummer {dupes.join(', ')} ist doppelt vergeben.
+        </div>
+      )}
+      <div className="list">
+        {ids.map((id) => {
+          const p = players.get(id);
+          const stamm = p?.jerseyNumber || '';
+          const changed = (draft[id] || '') !== stamm;
+          return (
+            <div className="list-row" key={id}>
+              <span className="tag" style={{ minWidth: 42, textAlign: 'center' }}>
+                {label(id)}
+              </span>
+              <span className="grow">
+                <span className="title">{p?.name || 'Unbekannt'}</span>
+                <span className="sub" style={{ display: 'block' }}>
+                  {stamm ? `Stammnummer ${stamm}` : 'keine Stammnummer'}
+                  {changed && stamm ? (
+                    <button className="link-btn" style={{ marginLeft: 8 }} onClick={() => setDraft((d) => ({ ...d, [id]: stamm }))}>
+                      zurücksetzen
+                    </button>
+                  ) : null}
+                </span>
+              </span>
+              <input
+                className={'card-input' + (changed ? ' has' : '') + (dupes.includes(draft[id]) ? ' dupe' : '')}
+                inputMode="numeric"
+                maxLength={3}
+                value={draft[id] || ''}
+                placeholder="–"
+                aria-label={`Rückennummer ${p?.name}`}
+                onFocus={(x) => x.currentTarget.select()}
+                onChange={(x) => setDraft((d) => ({ ...d, [id]: x.target.value.replace(/\D/g, '').slice(0, 3) }))}
+              />
+            </div>
           );
         })}
       </div>
