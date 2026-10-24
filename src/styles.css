@@ -1659,6 +1659,7 @@ section:first-of-type > .month-label {
   background: var(--surface);
   width: 100%;
   max-height: calc(100vh - 40px - var(--safe-top));
+  max-height: calc(100dvh - 40px - var(--safe-top));
   border-radius: 20px 20px 0 0;
   display: flex;
   flex-direction: column;
@@ -1714,6 +1715,8 @@ section:first-of-type > .month-label {
 }
 .sheet-body {
   padding: 8px 20px 20px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2311,9 +2314,15 @@ body {
   display: none;
 }
 .kb-open .sheet {
-  max-height: calc(100vh - var(--kb, 0px) - 20px - var(--safe-top));
+  max-height: calc(100vh - var(--kb, 0px) - 8px - var(--safe-top));
+  max-height: calc(100dvh - var(--kb, 0px) - 8px - var(--safe-top));
   margin-bottom: var(--kb, 0px);
+  padding-bottom: 0;
 }
+/* Bei offener Tastatur: Fenster-Kopf und -Fuß kompakter, damit mehr Inhalt sichtbar bleibt */
+.kb-open .sheet-head { padding-top: 12px; padding-bottom: 2px; }
+.kb-open .sheet-foot { padding-top: 8px; padding-bottom: 8px; }
+.kb-open .sheet-foot .btn { min-height: 38px; padding-top: 6px; padding-bottom: 6px; }
 /* Anmeldung auf dem Handy: oben ausrichten und kompakter, damit Passwort und Knopf über der Tastatur bleiben */
 @media (max-width: 599px) {
   .login {

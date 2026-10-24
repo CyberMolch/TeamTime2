@@ -156,12 +156,29 @@ export function setupKeyboardAvoidance() {
   if (!isNative()) return;
   import('@capacitor/keyboard')
     .then(({ Keyboard }) => {
+      // Android verkleinert das Fenster meist schon selbst (adjustResize). Dann darf die App nicht noch
+      // einmal Platz für die Tastatur abziehen – nur den Teil, den das Fenster NICHT geschrumpft ist.
+      let base = window.innerHeight;
+      let kbh = 0;
+      const apply = () => {
+        const shrunk = Math.max(0, base - window.innerHeight);
+        root.style.setProperty('--kb', `${Math.max(0, kbh - shrunk)}px`);
+      };
       Keyboard.addListener('keyboardWillShow', (info) => {
-        root.style.setProperty('--kb', `${info.keyboardHeight}px`);
+        if (!root.classList.contains('kb-open')) base = window.innerHeight;
+        kbh = info.keyboardHeight;
+        root.style.setProperty('--kb', '0px');
         root.classList.add('kb-open');
       });
-      Keyboard.addListener('keyboardDidShow', () => setTimeout(reveal, 30));
+      Keyboard.addListener('keyboardDidShow', () => {
+        apply();
+        setTimeout(() => {
+          apply();
+          reveal();
+        }, 120);
+      });
       Keyboard.addListener('keyboardWillHide', () => {
+        kbh = 0;
         root.style.setProperty('--kb', '0px');
         root.classList.remove('kb-open');
       });
