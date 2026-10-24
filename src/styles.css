@@ -2616,3 +2616,4 @@ body {
 .bench-box { flex: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-strong); display: grid; place-items: center; background: var(--surface); color: #fff; }
 .bench-box.on { background: var(--green); border-color: var(--green); }
 .bench-pick:disabled { cursor: default; }
+.update-banner { align-items: center; flex-wrap: wrap; }

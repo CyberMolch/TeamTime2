@@ -6,6 +6,7 @@ import { Icon } from './components/Icon';
 import { handleBack, Sheet } from './components/ui';
 import { hideSplash, onAndroidBack, styleStatusBar } from './lib/native';
 import { onReminderTap, scheduleReminders } from './lib/reminders';
+import { checkForUpdate, type Update } from './lib/update';
 import { initials } from './lib/stats';
 import { Login } from './views/Login';
 import { Dashboard } from './views/Dashboard';
@@ -44,6 +45,22 @@ export function App() {
   const stackRef = useRef(stack);
   stackRef.current = stack;
   const [moreOpen, setMoreOpen] = useState(false);
+  const [update, setUpdate] = useState<Update | null>(null);
+
+  // Neue Version? Beim Start, alle 10 Minuten und beim Zurückkehren in die App prüfen
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    const run = () => checkForUpdate().then((u) => u && setUpdate(u));
+    const t0 = setTimeout(run, 3000);
+    const iv = setInterval(run, 10 * 60_000);
+    const vis = () => document.visibilityState === 'visible' && run();
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', vis);
+    };
+  }, [phase]);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -182,6 +199,21 @@ export function App() {
         </header>
 
         <main className="main" ref={mainRef}>
+          {update && (
+            <div className="banner banner-info update-banner">
+              <Icon name="download" />
+              <span className="grow">{update.kind === 'web' ? 'Eine neue Version von TeamTime ist da.' : `Neue App-Version ${update.version} verfügbar.`}</span>
+              {update.kind === 'web' ? (
+                <button className="btn btn-sm btn-primary" onClick={() => location.reload()}>
+                  Neu laden
+                </button>
+              ) : (
+                <a className="btn btn-sm btn-primary" href={update.url} target="_blank" rel="noreferrer">
+                  Herunterladen
+                </a>
+              )}
+            </div>
+          )}
           {store.error && (
             <div className="banner banner-warn">
               <Icon name="alert" />
