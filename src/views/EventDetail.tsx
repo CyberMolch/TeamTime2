@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { AttendanceStatus, Fine, Player, isStaff, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
+import { AttendanceStatus, Fine, Player, STAFF_ROLES, isStaff, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { formatDate, isOver, nowISOString, relativeDay, todayISO } from '../lib/dates';
 import { countStatus, euro, parseResult } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
@@ -29,7 +29,7 @@ const MORE_STATUS: { st: AttendanceStatus; icon: string; hint: string }[] = [
   { st: 'injured', icon: 'medical', hint: 'Zählt nicht in die Quote' },
 ];
 
-function AttendanceRow({ player, status, onSet, onMore }: { player: Player; status: AttendanceStatus; onSet: (st: AttendanceStatus) => void; onMore: () => void }) {
+function AttendanceRow({ player, status, onSet, onMore, role }: { player: Player; status: AttendanceStatus; onSet: (st: AttendanceStatus) => void; onMore: () => void; role?: string }) {
   const special = status === 'excused' || status === 'injured';
   return (
     <div className={'att-row' + (status !== 'none' ? ` is-${status}` : '')}>
@@ -41,7 +41,8 @@ function AttendanceRow({ player, status, onSet, onMore }: { player: Player; stat
           {player.name}
         </span>
         <span className={'att-label' + (status === 'none' ? ' muted' : '')} style={status === 'none' ? undefined : { color: `var(--st-${status})` }}>
-          {status === 'none' ? 'Keine Rückmeldung' : STATUS_LABEL[status]}
+          {role ? `${role} · ` : ''}
+          {status === 'none' ? (role ? 'offen' : 'Keine Rückmeldung') : STATUS_LABEL[status]}
         </span>
       </span>
       <div className="att-buttons" role="group" aria-label={`Rückmeldung von ${player.name}`}>
@@ -96,6 +97,8 @@ export function EventDetail({ id }: { id: string }) {
   const over = isOver(e.date, e.time);
   // Inaktive Spieler nur zeigen, wenn sie bei diesem Termin eingetragen sind
   const roster = allPlayers.filter((p) => !isStaff(p) && (!p.inactive || (e.attendance[p.id] && e.attendance[p.id] !== 'none')));
+  // Trainerteam: eigene Zusagen, zählen aber nicht in Quote und Zähler
+  const staffRoster = allPlayers.filter((p) => isStaff(p) && (!p.inactive || (e.attendance[p.id] && e.attendance[p.id] !== 'none'))).sort((a, b) => STAFF_ROLES.indexOf(a.position!) - STAFF_ROLES.indexOf(b.position!));
   const c = countStatus(e, roster);
 
   const setStatus = (pid: string, st: AttendanceStatus) => {
@@ -252,6 +255,21 @@ export function EventDetail({ id }: { id: string }) {
                 <AttendanceRow key={p.id} player={p} status={e.attendance[p.id] || 'none'} onSet={(st) => setStatus(p.id, st)} onMore={() => setMoreFor(p)} />
               ))}
             </div>
+          )}
+          {staffRoster.length > 0 && (
+            <section className="section">
+              <div className="section-head">
+                <h2>Trainerteam</h2>
+                <span className="small muted">
+                  {staffRoster.filter((p) => e.attendance[p.id] === 'present').length} von {staffRoster.length} dabei · zählt nicht in die Quote
+                </span>
+              </div>
+              <div className="list">
+                {staffRoster.map((p) => (
+                  <AttendanceRow key={p.id} player={p} role={p.position} status={e.attendance[p.id] || 'none'} onSet={(st) => setStatus(p.id, st)} onMore={() => setMoreFor(p)} />
+                ))}
+              </div>
+            </section>
           )}
           <p className="small muted" style={{ marginTop: 10 }}>
             Nochmal tippen entfernt den Eintrag. „Entschuldigt“ und „verletzt“ findest du unter den drei Punkten.
