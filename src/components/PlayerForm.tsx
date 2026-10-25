@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Player } from '../types';
+import { Player, STAFF_ROLES } from '../types';
 import { useStore } from '../data/store';
 import { newId, pickImage } from '../lib/native';
 import { Avatar, Field, Sheet, useDialog } from './ui';
 
-export const POSITIONS = ['Tor', 'Abwehr', 'Mittelfeld', 'Sturm'];
+export const PLAYER_POSITIONS = ['Tor', 'Abwehr', 'Mittelfeld', 'Sturm'];
+export const POSITIONS = [...PLAYER_POSITIONS, ...STAFF_ROLES];
 
 export function PlayerForm({ player, onClose, onSaved }: { player?: Player; onClose: () => void; onSaved?: (id: string) => void }) {
   const { savePlayer, allPlayers } = useStore();
@@ -75,9 +76,17 @@ export function PlayerForm({ player, onClose, onSaved }: { player?: Player; onCl
         <Field label="Position">
           <select value={p.position || ''} onChange={(e) => set({ position: e.target.value || undefined })}>
             <option value="">–</option>
-            {[...new Set([...POSITIONS, ...(p.position && !POSITIONS.includes(p.position) ? [p.position] : [])])].map((x) => (
-              <option key={x}>{x}</option>
-            ))}
+            <optgroup label="Spieler">
+              {PLAYER_POSITIONS.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Trainerteam">
+              {STAFF_ROLES.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </optgroup>
+            {p.position && !POSITIONS.includes(p.position) && <option>{p.position}</option>}
           </select>
         </Field>
         <Field label="Geburtsdatum">

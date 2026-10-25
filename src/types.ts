@@ -207,3 +207,7 @@ export const DEFAULT_CLUB: ClubSettings = {
   coachName: '',
   theme: 'system',
 };
+
+/** Funktionen im Trainerteam – zählen nicht als Spieler (Aufstellung, Zusagen, Auswertung) */
+export const STAFF_ROLES = ['Trainer', 'Co.-Trainer', 'Teammanager', 'Betreuer'];
+export const isStaff = (p?: { position?: string }) => !!p?.position && STAFF_ROLES.includes(p.position);

@@ -5,7 +5,7 @@ import { ClubLogo } from './components/ClubLogo';
 import { Icon } from './components/Icon';
 import { handleBack, Sheet } from './components/ui';
 import { hideSplash, onAndroidBack, styleStatusBar } from './lib/native';
-import { onReminderTap, scheduleReminders } from './lib/reminders';
+import { onReminderTap, scheduleReminders, webBirthdayNotice } from './lib/reminders';
 import { checkForUpdate, type Update } from './lib/update';
 import { initials } from './lib/stats';
 import { Login } from './views/Login';
@@ -70,9 +70,14 @@ export function App() {
   // Erinnerungen bei jeder Änderung an Terminen oder Zusagen neu planen (nur in der App)
   useEffect(() => {
     if (phase !== 'ready' || store.backend?.kind !== 'cloud') return;
-    const t = setTimeout(() => scheduleReminders(store.events, store.players).catch(console.warn), 1500);
+    const t = setTimeout(() => scheduleReminders(store.events, store.players, undefined, [...store.players, ...store.staff]).catch(console.warn), 1500);
     return () => clearTimeout(t);
-  }, [phase, store.events, store.players, store.backend]);
+  }, [phase, store.events, store.players, store.staff, store.backend]);
+
+  // Geburtstag im Browser: beim Öffnen einmal melden
+  useEffect(() => {
+    if (phase === 'ready') webBirthdayNotice([...store.players, ...store.staff]);
+  }, [phase, store.players, store.staff]);
 
   const go = useCallback((r: Route) => {
     setStack((s) => {
@@ -95,7 +100,7 @@ export function App() {
   // Tippen auf eine Erinnerung öffnet den Termin
   useEffect(() => {
     let off = () => {};
-    onReminderTap((id) => go({ tab: 'events', eventId: id }))
+    onReminderTap((t) => (t.eventId ? go({ tab: 'events', eventId: t.eventId }) : t.playerId && go({ tab: 'team', playerId: t.playerId })))
       .then((f) => (off = f))
       .catch(() => {});
     return () => off();

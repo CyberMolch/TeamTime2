@@ -1,5 +1,5 @@
 import { Player, TeamEvent, isMatch } from '../types';
-import { addDays, eventStart, isOver, todayISO } from './dates';
+import { addDays, eventStart, isOver, nextBirthday, todayISO } from './dates';
 import { countStatus } from './stats';
 import { eventHeading } from './texts';
 import { isNative, saveFile } from './native';
@@ -14,10 +14,12 @@ export interface ReminderPrefs {
   time: string; // für 'eve'
   hoursBefore: number; // für 'before'
   onlyOpen: boolean; // nur erinnern, wenn noch Rückmeldungen fehlen
+  birthdays: boolean; // Benachrichtigung am Geburtstag
+  birthdayTime: string; // Uhrzeit am Geburtstag
 }
 
 const KEY = 'teamtime2:reminders';
-export const DEFAULT_REMINDERS: ReminderPrefs = { enabled: false, when: 'eve', time: '18:00', hoursBefore: 3, onlyOpen: false };
+export const DEFAULT_REMINDERS: ReminderPrefs = { enabled: false, when: 'eve', time: '18:00', hoursBefore: 3, onlyOpen: false, birthdays: true, birthdayTime: '09:00' };
 
 export function loadReminderPrefs(): ReminderPrefs {
   try {
@@ -51,11 +53,51 @@ function reminderTime(e: TeamEvent, p: ReminderPrefs): Date {
 
 let lastSignature = '';
 
-/** Plant die Erinnerungen für die nächsten 30 Tage neu (nur in der App). */
-export async function scheduleReminders(events: TeamEvent[], players: Player[], prefs = loadReminderPrefs()): Promise<number> {
+/** Geburtstags-Benachrichtigungen: je Person der nächste Geburtstag zur eingestellten Uhrzeit */
+function birthdayNotifications(people: Player[], prefs: ReminderPrefs, now: number) {
+  if (!prefs.birthdays) return [];
+  return people
+    .filter((p) => p.birthDate)
+    .map((p, i) => {
+      const b = nextBirthday(p.birthDate!);
+      let at = eventStart(b.date, prefs.birthdayTime);
+      // Heute schon vorbei → nächstes Jahr
+      if (at.getTime() <= now + 60_000) at = eventStart(addDays(b.date, 365), prefs.birthdayTime);
+      const first = p.name.split(' ')[0];
+      return {
+        id: 5000 + i,
+        title: `🎂 ${p.name} hat heute Geburtstag`,
+        body: `${first} wird ${at.getFullYear() - Number(p.birthDate!.slice(0, 4))} – tippe, um zu gratulieren.`,
+        schedule: { at, allowWhileIdle: true },
+        extra: { playerId: p.id },
+      };
+    })
+    .filter((n) => n.schedule.at.getTime() - now < 370 * 86_400_000)
+    .slice(0, 40);
+}
+
+const ASKED = 'teamtime2:notify-asked';
+
+/** Plant die Erinnerungen für die nächsten 30 Tage und die Geburtstage neu (nur in der App). */
+export async function scheduleReminders(events: TeamEvent[], players: Player[], prefs = loadReminderPrefs(), people: Player[] = players): Promise<number> {
   if (!isNative()) return 0;
   const { LocalNotifications } = await import('@capacitor/local-notifications');
   const now = Date.now();
+  const birthdays = birthdayNotifications(people, prefs, now);
+  // Geburtstage sind von Anfang an eingeschaltet: einmalig um Erlaubnis fragen
+  if (birthdays.length && !prefs.enabled) {
+    const cur = await LocalNotifications.checkPermissions();
+    if (cur.display !== 'granted') {
+      let asked = false;
+      try {
+        asked = !!localStorage.getItem(ASKED);
+        localStorage.setItem(ASKED, '1');
+      } catch {
+        /* egal */
+      }
+      if (asked || (await LocalNotifications.requestPermissions()).display !== 'granted') return 0;
+    }
+  }
   const limit = addDays(todayISO(), 30);
   const planned = !prefs.enabled
     ? []
@@ -83,6 +125,7 @@ export async function scheduleReminders(events: TeamEvent[], players: Player[], 
         .filter((x) => x.n.schedule.at.getTime() > now + 60_000 && (!prefs.onlyOpen || x.open > 0))
         .slice(0, 40)
         .map((x) => x.n);
+  planned.push(...(birthdays as typeof planned));
 
   const signature = JSON.stringify(planned.map((n) => [n.title, n.body, n.schedule.at.getTime()]));
   if (signature === lastSignature) return planned.length;
@@ -94,13 +137,13 @@ export async function scheduleReminders(events: TeamEvent[], players: Player[], 
   return planned.length;
 }
 
-/** Tippt man auf eine Erinnerung, öffnet sich der passende Termin. */
-export async function onReminderTap(cb: (eventId: string) => void): Promise<() => void> {
+/** Tippt man auf eine Erinnerung, öffnet sich der passende Termin bzw. der Spieler (Geburtstag). */
+export async function onReminderTap(cb: (target: { eventId?: string; playerId?: string }) => void): Promise<() => void> {
   if (!isNative()) return () => {};
   const { LocalNotifications } = await import('@capacitor/local-notifications');
   const sub = await LocalNotifications.addListener('localNotificationActionPerformed', (a) => {
-    const id = a.notification.extra?.eventId;
-    if (id) cb(id);
+    const { eventId, playerId } = a.notification.extra || {};
+    if (eventId || playerId) cb({ eventId, playerId });
   });
   return () => sub.remove();
 }
@@ -139,4 +182,33 @@ export function buildICS(events: TeamEvent[], clubName: string): string {
 
 export async function exportCalendar(events: TeamEvent[], clubName: string, filename = 'teamtime-termine.ics') {
   await saveFile(filename, buildICS(events, clubName), 'text/calendar');
+}
+
+// ---------- Geburtstage im Browser (PC) ----------
+// Im Browser lässt sich nichts im Voraus planen: beim Öffnen am Geburtstag einmal melden.
+const WEB_KEY = 'teamtime2:bday-notified';
+export function webBirthdayNotice(people: Player[], prefs = loadReminderPrefs()) {
+  if (isNative() || !prefs.birthdays || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const today = todayISO();
+  let done: string[] = [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(WEB_KEY) || '{}');
+    done = raw.date === today ? raw.ids || [] : [];
+  } catch {
+    /* egal */
+  }
+  const due = people.filter((p) => p.birthDate && p.birthDate.slice(5) === today.slice(5) && !done.includes(p.id));
+  for (const p of due) {
+    try {
+      new Notification(`🎂 ${p.name} hat heute Geburtstag`, { body: `${p.name.split(' ')[0]} wird ${Number(today.slice(0, 4)) - Number(p.birthDate!.slice(0, 4))}.`, icon: './icon-192.png', tag: `bday-${p.id}-${today}` });
+    } catch {
+      /* egal */
+    }
+  }
+  if (due.length)
+    try {
+      localStorage.setItem(WEB_KEY, JSON.stringify({ date: today, ids: [...done, ...due.map((p) => p.id)] }));
+    } catch {
+      /* egal */
+    }
 }

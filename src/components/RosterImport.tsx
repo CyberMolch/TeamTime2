@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Player } from '../types';
+import { Player, isStaff } from '../types';
 import { useStore } from '../data/store';
 import { currentSeasonStart, seasonLabel, todayISO } from '../lib/dates';
 import { newId, pickFile } from '../lib/native';
@@ -79,7 +79,7 @@ export function RosterImport({ onClose }: { onClose: () => void }) {
       if (match) used.add(match.id);
       return { row: r, match };
     });
-    const missing = allPlayers.filter((p) => !used.has(p.id) && !p.inactive);
+    const missing = allPlayers.filter((p) => !used.has(p.id) && !p.inactive && !isStaff(p));
     return { items, missing, hasStats: rows.some((r) => r.apps !== undefined || r.goals !== undefined) };
   }, [text, allPlayers]);
 

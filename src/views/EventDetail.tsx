@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { AttendanceStatus, Fine, Player, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
+import { AttendanceStatus, Fine, Player, isStaff, STATUS_LABEL, TYPE_LABEL, TeamEvent, isMatch } from '../types';
 import { formatDate, isOver, nowISOString, relativeDay, todayISO } from '../lib/dates';
 import { countStatus, euro, parseResult } from '../lib/stats';
 import { eventHeading, eventShareText } from '../lib/texts';
@@ -95,7 +95,7 @@ export function EventDetail({ id }: { id: string }) {
   const match = isMatch(e.type);
   const over = isOver(e.date, e.time);
   // Inaktive Spieler nur zeigen, wenn sie bei diesem Termin eingetragen sind
-  const roster = allPlayers.filter((p) => !p.inactive || (e.attendance[p.id] && e.attendance[p.id] !== 'none'));
+  const roster = allPlayers.filter((p) => !isStaff(p) && (!p.inactive || (e.attendance[p.id] && e.attendance[p.id] !== 'none')));
   const c = countStatus(e, roster);
 
   const setStatus = (pid: string, st: AttendanceStatus) => {

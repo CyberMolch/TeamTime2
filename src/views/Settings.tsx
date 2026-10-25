@@ -3,7 +3,7 @@ import { useStore } from '../data/store';
 import { ClubSettings, TeamData } from '../types';
 import { formatDateNumeric, isOver, todayISO } from '../lib/dates';
 import { isNative, pickFile, pickImage, saveFile } from '../lib/native';
-import { exportCalendar, loadReminderPrefs, ReminderPrefs, requestNotificationPermission, saveReminderPrefs, scheduleReminders } from '../lib/reminders';
+import { exportCalendar, loadReminderPrefs, ReminderPrefs, requestNotificationPermission, saveReminderPrefs, scheduleReminders, webBirthdayNotice } from '../lib/reminders';
 import { buildReport, savePDF } from '../lib/pdf';
 import { ClubLogo } from '../components/ClubLogo';
 import { Icon } from '../components/Icon';
@@ -233,9 +233,10 @@ export function SettingsView() {
 }
 
 function RemindersPanel() {
-  const { events, players, backend } = useStore();
+  const { events, players, staff, backend } = useStore();
   const { toast } = useDialog();
   const [prefs, setPrefs] = useState<ReminderPrefs>(loadReminderPrefs);
+  const [webPerm, setWebPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied');
   const [count, setCount] = useState<number | null>(null);
   const native = isNative();
 
@@ -248,10 +249,19 @@ function RemindersPanel() {
         next = { ...next, enabled: false };
       }
     }
+    if (patch.birthdays && native) {
+      const ok = await requestNotificationPermission();
+      if (!ok) toast('Benachrichtigungen sind für TeamTime nicht erlaubt. Erlaube sie in den Android-Einstellungen.');
+    }
+    if (patch.birthdays && !native && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      const r = await Notification.requestPermission();
+      setWebPerm(r);
+      if (r === 'granted') webBirthdayNotice([...players, ...staff], next);
+    }
     setPrefs(next);
     saveReminderPrefs(next);
     if (backend?.kind === 'cloud') {
-      const n = await scheduleReminders(events, players, next).catch(() => 0);
+      const n = await scheduleReminders(events, players, next, [...players, ...staff]).catch(() => 0);
       setCount(n);
     }
   };
@@ -259,6 +269,33 @@ function RemindersPanel() {
   return (
     <section className="panel panel-pad">
       <h2 className="panel-title">Erinnerungen</h2>
+      <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
+        <label className="switch-row">
+          <span className="grow">
+            <b>🎂 Geburtstage</b>
+            <span className="small muted" style={{ display: 'block' }}>
+              {native
+                ? 'Benachrichtigung am Geburtstag eines Spielers oder Betreuers'
+                : 'Hinweis im Browser, wenn du TeamTime am Geburtstag öffnest (in der Android-App kommt er automatisch)'}
+            </span>
+          </span>
+          <input type="checkbox" className="switch" checked={prefs.birthdays} onChange={(e) => update({ birthdays: e.target.checked })} />
+        </label>
+        {prefs.birthdays && native && (
+          <Field label="Uhrzeit am Geburtstag">
+            <input type="time" value={prefs.birthdayTime} onChange={(e) => e.target.value && update({ birthdayTime: e.target.value })} style={{ maxWidth: 160 }} />
+          </Field>
+        )}
+        {prefs.birthdays && !native && webPerm !== 'granted' && (
+          <p className="small muted" style={{ margin: 0 }}>
+            {webPerm === 'denied' ? 'Der Browser blockiert Benachrichtigungen für diese Seite – in den Website-Einstellungen erlauben.' : (
+              <button className="btn btn-sm" onClick={async () => setWebPerm(await Notification.requestPermission())}>
+                Benachrichtigungen im Browser erlauben
+              </button>
+            )}
+          </p>
+        )}
+      </div>
       {!native ? (
         <p className="small muted">
           Erinnerungen vor Trainings und Spielen bekommst du in der Android-App aufs Handy. Für deinen Kalender am PC nutze unten „Termine für den Kalender“.

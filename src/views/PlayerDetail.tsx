@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store';
 import { useNav } from '../nav';
-import { CardCount, STATUS_LABEL, isMatch } from '../types';
+import { CardCount, STATUS_LABEL, isMatch, isStaff } from '../types';
 import { ageOn, currentSeasonStart, formatDate, formatDateNumeric, nextSeasonStart, seasonKey, seasonLabel } from '../lib/dates';
 import { addCards, attendanceFor, cardTotals, euro, fineBalance, pastEvents, presentStreak, scorerStats } from '../lib/stats';
 import { eventTitle } from '../lib/texts';
@@ -114,6 +114,7 @@ export function PlayerDetail({ id }: { id: string }) {
         </button>
       </div>
 
+      {!isStaff(p) && (<>
       <div className="toolbar">
         <Segmented
           label="Zeitraum"
@@ -177,10 +178,11 @@ export function PlayerDetail({ id }: { id: string }) {
           </div>
         </div>
       </div>
+      </>)}
 
       <div className="grid-2 section">
         <div style={{ display: 'grid', gap: 16 }}>
-          <div className="panel panel-pad">
+          {!isStaff(p) && <div className="panel panel-pad">
             <h3 style={{ marginBottom: 10 }}>Anwesenheit</h3>
             <dl className="kv">
               <dt>Training</dt>
@@ -201,7 +203,7 @@ export function PlayerDetail({ id }: { id: string }) {
             <p className="small muted" style={{ marginTop: 10 }}>
               Quote = dabei geteilt durch alle Termine mit Eintrag. Verletzt zählt nicht mit.
             </p>
-          </div>
+          </div>}
           <section>
             <div className="section-head">
               <h2>Letzte Termine</h2>

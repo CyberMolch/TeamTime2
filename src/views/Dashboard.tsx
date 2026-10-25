@@ -16,7 +16,7 @@ import { GameUpdateSheet, LastGameCard } from '../components/GameUpdate';
 import { LineupEditor } from '../components/LineupEditor';
 
 export function Dashboard() {
-  const { players, events, club } = useStore();
+  const { players, staff, events, club } = useStore();
   const { go } = useNav();
   const { toast } = useDialog();
   const today = todayISO();
@@ -37,7 +37,7 @@ export function Dashboard() {
 
   const fines = fineBalance(club.fines || []);
 
-  const birthdays = players
+  const birthdays = [...players, ...staff]
     .filter((p) => p.birthDate)
     .map((p) => ({ p, ...nextBirthday(p.birthDate!) }))
     .filter((b) => b.inDays <= 30)

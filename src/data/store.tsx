@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ClubSettings, DEFAULT_CLUB, Player, TeamData, TeamEvent } from '../types';
+import { ClubSettings, DEFAULT_CLUB, Player, TeamData, TeamEvent, STAFF_ROLES, isStaff } from '../types';
 import { Backend, SyncMeta, createDemoBackend } from './backend';
 import { byName } from '../lib/stats';
 
@@ -15,8 +15,10 @@ interface StoreValue {
   meta: SyncMeta;
   online: boolean;
   error: string | null;
-  /** aktive Spieler, alphabetisch */
+  /** aktive Spieler (ohne Trainerteam), alphabetisch */
   players: Player[];
+  /** aktives Trainerteam (Trainer, Co.-Trainer, Teammanager, Betreuer) */
+  staff: Player[];
   /** alle Spieler inkl. inaktive */
   allPlayers: Player[];
   /** Termine nach Datum aufsteigend */
@@ -143,7 +145,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [mode]);
 
   const allPlayers = useMemo(() => [...data.players].sort(byName), [data.players]);
-  const players = useMemo(() => allPlayers.filter((p) => !p.inactive), [allPlayers]);
+  const players = useMemo(() => allPlayers.filter((p) => !p.inactive && !isStaff(p)), [allPlayers]);
+  const staff = useMemo(() => allPlayers.filter((p) => !p.inactive && isStaff(p)).sort((a, b) => STAFF_ROLES.indexOf(a.position!) - STAFF_ROLES.indexOf(b.position!) || byName(a, b)), [allPlayers]);
   const events = useMemo(
     () => [...data.events].sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')),
     [data.events],
@@ -175,6 +178,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     online,
     error,
     players,
+    staff,
     allPlayers,
     events,
     club: data.club,
