@@ -21,6 +21,7 @@ export function Dashboard() {
   const { toast } = useDialog();
   const today = todayISO();
   const [updating, setUpdating] = useState(false);
+  const [showAllBdays, setShowAllBdays] = useState(false);
 
   const upcoming = useMemo(() => events.filter((e) => !isOver(e.date, e.time)), [events]);
   const next = upcoming.find((e) => !e.cancelled);
@@ -85,7 +86,7 @@ export function Dashboard() {
             <h3>Geburtstage</h3>
             <span className="small muted">nächste 30 Tage</span>
           </div>
-          {birthdays.slice(0, 4).map(({ p, inDays, turns, date }) => (
+          {(showAllBdays ? birthdays : birthdays.slice(0, 4)).map(({ p, inDays, turns, date }) => (
             <div key={p.id} className={'bday-row' + (inDays === 0 ? ' is-today' : '')}>
               <button className="bday-main" onClick={() => go({ tab: 'team', playerId: p.id })}>
                 <span className="bday-date">
@@ -115,8 +116,8 @@ export function Dashboard() {
             </div>
           ))}
           {birthdays.length > 4 && (
-            <button className="bday-more" onClick={() => go({ tab: 'team' })}>
-              + {birthdays.length - 4} weitere
+            <button className="bday-more" onClick={() => setShowAllBdays(!showAllBdays)} aria-expanded={showAllBdays}>
+              {showAllBdays ? 'Weniger anzeigen' : `+ ${birthdays.length - 4} weitere anzeigen`}
             </button>
           )}
         </section>
